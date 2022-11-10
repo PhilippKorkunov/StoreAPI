@@ -23,7 +23,7 @@ namespace StoreAPI.Controllers
         public IActionResult Delete(JsonDocument jsonDocument) => SqlRequest(jsonDocument, MethodBase.GetCurrentMethod().Name);
 
 
-        public IActionResult SqlRequest(JsonDocument jsonDocument, string? method)
+        private IActionResult SqlRequest(JsonDocument jsonDocument, string? method)
         {
             if (method is null) { return BadRequest("Method is null"); }
 
@@ -58,7 +58,7 @@ namespace StoreAPI.Controllers
             }
         }
 
-        public static string ToJsonString(JsonDocument jdoc)
+        private static string ToJsonString(JsonDocument jdoc)
         {
             using (var stream = new MemoryStream())
             {
