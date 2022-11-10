@@ -13,19 +13,13 @@ namespace StoreAPI.PostgreSQLProcsessing
         }
         public DeleteRequest(Dictionary<string, string> dict) : base(dict)
         {
+            CheckTableNamesLength(1);
             IdList = dict["Id"].Replace(" ", "").Split(',').ToList();
             WhereCondition = BuildWhereCondition();
-            CheckTableNamesLength();
             Command = $"delete from {TableNames[0]} {WhereCondition}";
         }
 
-        private void CheckTableNamesLength()
-        {
-            if (TableNames.Length != 1)
-            {
-                throw new Exception("It's required to post only one table name!!!");
-            }
-        }
+        
 
         private string BuildWhereCondition()
         {

@@ -23,7 +23,7 @@ namespace StoreAPI.PostgreSQLProcsessing
             RequestColumns = String.IsNullOrWhiteSpace(dict["columnNames"]) ? null : dict["columnNames"].Replace(" ", "").Split(',');
             WhereCondition = dict.Keys.Contains("where") ? $"where {dict["where"]}" : String.Empty;
             GroupByColumn = dict.Keys.Contains("groupBy") ? $"group by {dict["groupBy"]}" : String.Empty;
-            InnerJoinString = RequestColumns is not null && RequestColumns.Length > 1 ? "" : ""; 
+            //InnerJoinString = RequestColumns is not null && RequestColumns.Length > 1 ? "" : ""; 
 
             UniqueColumns = new List<string>();
             FoundColumns = FindColumns(TableNames);
@@ -75,8 +75,6 @@ namespace StoreAPI.PostgreSQLProcsessing
             }
         }
 
-
-
         private string FindTableOfColumn(string columnName)
         {
             foreach (string tableName in FoundColumns.Keys)
@@ -89,8 +87,6 @@ namespace StoreAPI.PostgreSQLProcsessing
 
             throw new Exception($"Column {columnName} hasn't found");
         }
-
-
 
         private void BuildSelectString()
         {
@@ -108,7 +104,6 @@ namespace StoreAPI.PostgreSQLProcsessing
 
             Command = $"select {String.Join(", ", columns)}";
         }
-
 
 
         public DataTable? Execute() => Request.Execute(Command, isReader:true);

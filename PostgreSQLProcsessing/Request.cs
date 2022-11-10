@@ -35,7 +35,18 @@ namespace StoreAPI.PostgreSQLProcsessing
             CheckTableNamesRight();
             Command = String.Empty;
         }
-        
+
+
+
+
+        private protected void CheckTableNamesLength(int tablesNumber)
+        {
+            if (TableNames.Length != tablesNumber)
+            {
+                throw new Exception($"It's required to post only fixed number of tables: {tablesNumber}!!!");
+            }
+        }
+
 
         private protected static void CheckDictCorrection(Dictionary<string, string> dict)
         {
