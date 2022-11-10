@@ -81,6 +81,12 @@ namespace StoreAPI.PostgreSQLProcsessing
             }
         }
 
+        private protected string BuildWhereConditionWithId(List<string> idList)
+        {
+            var list = from id in idList
+                       select $"{KeyDict["pk"][TableNames[0]]} = {id}";
+            return $"where {String.Join(" or ", list)}";
+        }
         private protected static DataTable? Execute(string cmd, bool isReader = false)
         {
             using (NpgsqlConnection connection = new NpgsqlConnection(ConnectionString))

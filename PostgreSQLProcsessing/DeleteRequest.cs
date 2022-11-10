@@ -15,7 +15,7 @@ namespace StoreAPI.PostgreSQLProcsessing
         {
             CheckTableNamesLength(1);
             IdList = dict["Id"].Replace(" ", "").Split(',').ToList();
-            WhereCondition = BuildWhereConditionWithId();
+            WhereCondition = BuildWhereConditionWithId(IdList);
             Command = $"delete from {TableNames[0]} {WhereCondition}";
         }
 
