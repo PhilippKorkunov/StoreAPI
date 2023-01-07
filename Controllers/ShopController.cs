@@ -36,11 +36,12 @@ namespace StoreAPI.Controllers
 
 
         [HttpGet("SelectOrder")]
-        public IActionResult SelectOrder(string login, string password, bool isAdmin)
+        public IActionResult SelectOrder(string idCustomer)
         {
             Dictionary<string, string> dict = new Dictionary<string, string>();
             dict["tableNames"] = "store_order";
             dict["columnNames"] = " ";
+            dict["whereCondition"] = $"id_customer = {idCustomer}";
             var request = new SelectRequest(dict);
             return SqlRequestWithJson(method: "SelectCommand", command: request.Command);
         }
