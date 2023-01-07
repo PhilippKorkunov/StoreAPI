@@ -6,12 +6,12 @@ namespace StoreAPI.PostgreSQLProcsessing
 {
     public abstract class Request
     {
-        public string Command { get; set; }
+        public virtual string Command { get; set; }
         public string[] TableNames { get; set; }
-        private protected static List<string> RequiredKeys {get; set;}
-        public static string ConnectionString { get; private set; }
-        private protected static HashSet<string> AllTables {get; set;}
-        public static Dictionary<string, Dictionary<string, string>> KeyDict { get; set;}
+        private protected static List<string> RequiredKeys { get; set; }
+        private protected static string ConnectionString { get; private set; }
+        private protected static HashSet<string> AllTableNames { get; set; }
+        private protected static Dictionary<string, Table> Tables { get; set; }
 
         static Request()
         {
@@ -21,72 +21,31 @@ namespace StoreAPI.PostgreSQLProcsessing
             string port = "5432";
             string username = "postgres";
             string password = "qwe123@";
-            string dataBase = "ShopDB";
+            string dataBase = "StoreDB";
             ConnectionString = $"Server={server}; Port={port}; User Id={username}; Password={password}; Database={dataBase}";
-            AllTables = FindAllTables();
-            KeyDict = FindKeys();
+            AllTableNames = Table.FindAllTableNames();
+            Tables = new Dictionary<string, Table>();
+            foreach (var name in AllTableNames)
+            {
+                Tables[name] =  new Table(name);
+            }
         }
-    
 
         public Request(Dictionary<string, string> dict)
         {
             CheckDictCorrection(dict);
             TableNames = dict["tableNames"].Replace(" ", "").Split(',');
+            dict.Remove("tableNames");
             CheckTableNamesRight();
             Command = String.Empty;
         }
 
-
-
-
-        private protected void CheckTableNamesLength(int tablesNumber)
+        public Request(string command)
         {
-            if (TableNames.Length != tablesNumber)
-            {
-                throw new Exception($"It's required to post only fixed number of tables: {tablesNumber}!!!");
-            }
+            Command = command;
         }
 
 
-        private protected static void CheckDictCorrection(Dictionary<string, string> dict)
-        {
-            int requiredColumnsFound = 0;
-            foreach (var key in dict.Keys)
-            {
-                if (RequiredKeys.Contains(key)) { requiredColumnsFound++; }
-
-                string str = dict[key];
-
-                for (int i = 0; i < str.Length; i++)
-                {
-                    if (!(Char.IsDigit(str[i]) || str[i] == ' ' || str[i] == ',' || Char.IsLetter(str[i])))
-                    {
-                        throw new Exception($"Symbol '{str[i]}' was incorrect. Use ',' as a delimetr.");
-                    }
-                }
-            }
-
-            if (requiredColumnsFound != RequiredKeys.Count)
-            {
-                throw new Exception($"Some required keys weren't found.\nList of required keys: [{String.Join(',', RequiredKeys)}]");
-            }
-        }
-
-        private void CheckTableNamesRight()
-        {
-            var incorrectTables = TableNames.Except(AllTables);
-            if (incorrectTables.Count() > 0)
-            {
-                throw new Exception($"Some table names were incorrect. List of incorrect input: [{String.Join(',', incorrectTables)}]");
-            }
-        }
-
-        private protected string BuildWhereConditionWithId(List<string> idList)
-        {
-            var list = from id in idList
-                       select $"{KeyDict["pk"][TableNames[0]]} = {id}";
-            return $"where {String.Join(" or ", list)}";
-        }
         private protected static DataTable? Execute(string cmd, bool isReader = false)
         {
             using (NpgsqlConnection connection = new NpgsqlConnection(ConnectionString))
@@ -108,77 +67,68 @@ namespace StoreAPI.PostgreSQLProcsessing
             }
         }
 
-        private static Dictionary<string, Dictionary<string, string>> FindKeys()
+
+        private protected string BuildWhereConditionWithId(string tableName, string[] idList)
         {
-            var tables = from table in AllTables
-                         select $"TABLE_NAME = '{table}'";
-            string whereCondition = $"where {String.Join(" or ", tables)}";
-            string command = $"SELECT TABLE_NAME, constraint_name\r\n|| '(' || string_agg(column_name, ',') || ')' as tableName\r\n" +
-                $"FROM information_schema.constraint_column_usage \r\n {whereCondition}\r\nGROUP BY TABLE_NAME, \r\nconstraint_name;";
-
-            var keyTable = Execute(command, true);
-
-            Dictionary<string, string>? pKeyDict = new Dictionary<string, string>();
-            Dictionary<string, string>? fKeyDict = new Dictionary<string, string>();
-            var keys = new Dictionary<string, Dictionary<string, string>>()
-            {
-                {"fk", fKeyDict},
-                {"pk", pKeyDict},
-            };
-
-
-            Task[] tasks = new Task[keyTable.Rows.Count];
-            if (keyTable is not null)
-            {
-                int i = 0;
-                foreach (DataRow row in keyTable.Rows)
-                {
-                    tasks[i] = new Task(() =>
-                    {
-                        if (row[0] is not null && row[1] is not null)
-                        {
-                            string tableName = row[0].ToString();
-                            string constraintAndKey = row[1].ToString();
-                            if (constraintAndKey.Contains("fk"))
-                            {
-                                keys["fk"].Add(tableName, constraintAndKey.Split('(')[1].Split(')')[0]);
-                            }
-                            else if (constraintAndKey.Contains("pkey"))
-                            {
-                                keys["pk"].Add(tableName, constraintAndKey.Split('(')[1].Split(')')[0]);
-                            }
-                        }
-                    });
-                    tasks[i].Start();
-                    i++;
-                }
-
-                Task.WaitAll(tasks);
-            }
-
-            return keys;
+            var list = from id in idList
+                       select $"{Tables[tableName].PrimaryKey} = {id}";
+            return $"where {String.Join(" or ", list)}";
         }
 
-        private static HashSet<string> FindAllTables()
-        {
-            string findColumnsColumn = "SELECT table_name FROM information_schema.tables\r\n" +
-             "WHERE table_schema NOT IN ('information_schema','pg_catalog')";
-            HashSet<string> tables = new HashSet<string>();
 
-            var keyTable = Execute(findColumnsColumn, true);
-            if (keyTable is not null)
+
+        //Check Methods
+
+        private protected void CheckTableNamesLength(int tablesNumber)
+        {
+            if (TableNames.Length != tablesNumber)
             {
-                foreach (DataRow row in keyTable.Rows)
+                throw new Exception($"It's required to post only fixed number of tables: {tablesNumber}!!!");
+            }
+        }
+
+
+        private protected static void CheckDictCorrection(Dictionary<string, string> dict)
+        {
+            int requiredColumnsFound = 0;
+            foreach (var key in dict.Keys)
+            {
+                if (RequiredKeys.Contains(key)) { requiredColumnsFound++; }
+
+                string str = dict[key];
+
+                for (int i = 0; i < str.Length; i++)
                 {
-                    if (row["table_name"] is not null)
+                    if (!(Char.IsDigit(str[i]) || str[i] == ' ' || str[i] == ',' || Char.IsLetter(str[i]) || str[i] == '_' || str[i] == '='))
                     {
-                        tables.Add(row["table_name"].ToString());
+                        throw new Exception($"Symbol '{str[i]}' was incorrect. Use ',' as a delimetr.");
                     }
                 }
             }
 
-            return tables;
+            if (requiredColumnsFound != RequiredKeys.Count)
+            {
+                throw new Exception($"Some required keys weren't found.\nList of required keys: [{String.Join(',', RequiredKeys)}]");
+            }
         }
 
+        private void CheckTableNamesRight()
+        {
+            var incorrectTables = TableNames.Except(AllTableNames);
+            if (incorrectTables.Count() > 0)
+            {
+                throw new Exception($"Some table names were incorrect. List of incorrect input: [{String.Join(',', incorrectTables)}]");
+            }
+        }
+
+        private protected void CheckColumnNamesRight(string tableName, string[] columnNames)
+        {
+            var incorrectColumns = columnNames.Except(Tables[tableName].ColumnNames);
+            if (incorrectColumns.Count() > 0)
+            {
+                throw new Exception($"Some table names were incorrect. List of incorrect input: [{String.Join(',', incorrectColumns)}]");
+            }
+        }
     }
 }
+

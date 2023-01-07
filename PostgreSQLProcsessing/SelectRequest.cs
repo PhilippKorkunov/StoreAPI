@@ -1,85 +1,83 @@
 ﻿using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.Extensions.Options;
 using System.Data;
 using System.Linq;
+using System.Runtime.InteropServices;
+using static Npgsql.Replication.PgOutput.Messages.RelationMessage;
 
 namespace StoreAPI.PostgreSQLProcsessing
 {
     public class SelectRequest : Request
     {
+        private bool isCommand;
+
+        public override string Command { get => isCommand == true ? base.Command : $"select {String.Join(", ", RequestColumns)} from {InnerJoinString} {WhereCondition} {Limit}"; set => base.Command = value; }
         public string WhereCondition { get; set; }
-        public string GroupByColumn { get; set; }
         public string InnerJoinString { get; set; }
         public string[]? RequestColumns { get; set; }
+        public string Limit { get; set; } 
         private List<string> UniqueColumns { get; set; }
-        private Dictionary<string, List<string>> FoundColumns { get; set; }
-        
+
+        private Dictionary<string, Table> CurrentTables { get; set; }
 
         static SelectRequest()
         {
             RequiredKeys.Add("columnNames");
         }
+
         public SelectRequest(Dictionary<string, string> dict) : base(dict)
         {
-            RequestColumns = String.IsNullOrWhiteSpace(dict["columnNames"]) ? null : dict["columnNames"].Replace(" ", "").Split(',');
-            WhereCondition = dict.Keys.Contains("where") ? $"where {dict["where"]}" : String.Empty;
-            GroupByColumn = dict.Keys.Contains("groupBy") ? $"group by {dict["groupBy"]}" : String.Empty;
-            //InnerJoinString = RequestColumns is not null && RequestColumns.Length > 1 ? "" : ""; 
+            isCommand = false;
+            RequestColumns = String.IsNullOrWhiteSpace(dict["columnNames"]) ||
+                String.IsNullOrEmpty(dict["columnNames"]) ? null : dict["columnNames"].Replace(" ", "").Split(',');
 
-            UniqueColumns = new List<string>();
-            FoundColumns = FindColumns(TableNames);
-            CheckColumnNamesRight();
-        }
-
-        private Dictionary<string, List<string>> FindColumns(string[] tableNames)
-        {
-            Dictionary<string, List<string>> columnsDict = new Dictionary<string, List<string>>();
-            Task[] tasks = new Task[tableNames.Length];
-            for (int i = 0; i < tableNames.Length; i++)
+            if(dict.Keys.Contains("isTable") && dict["isTable"] == "true")
             {
-                tasks[i] = new Task(() =>
-                {
-                    string findColumnsCommand = $"select * from {tableNames[i]} limit 1)";
-                    var table = Execute(findColumnsCommand, true);
-                    if (table is not null)
-                    {
-                        var columns = (from i in table.Columns[i].ColumnName
-                                       select table.Columns[i].ColumnName).ToList<string>();
-                        UniqueColumns.Intersect(columns);
 
-                        columnsDict[tableNames[i]] = columns;
-                    }
-                    else
-                    {
-                        throw new Exception($"Table {tableNames[i]} is null");
-                    }
-                });
-                tasks[i].Start();
             }
-            Task.WaitAll(tasks);
-
-            return columnsDict;
-        }
-
-
-
-        private void CheckColumnNamesRight()
-        {
-            if (RequestColumns is not null)
+            else
             {
-                HashSet<string> unfoundColumns = (HashSet<string>)UniqueColumns.Except(RequestColumns);
-                if (unfoundColumns.Count > 0)
+                CurrentTables = new Dictionary<string, Table>();
+                foreach (var name in TableNames)
                 {
-                    throw new Exception($"Some columns haven't found: [{String.Join(',', unfoundColumns)}]");
+                    Table table = (Table)Tables[name].Clone();
+                    CurrentTables[name] = table;
                 }
-                UniqueColumns.Clear();
             }
+
+            WhereCondition = dict.Keys.Contains("whereCondition") ? $"where {dict["whereCondition"]}" : String.Empty;
+            InnerJoinString = TableNames.Length == 1 ? "" : BuildJoinString(); 
+            Limit = dict.Keys.Contains("Limit") ? $"Limit {dict["Limit"]}" : String.Empty;
+            UniqueColumns = FindUniqueColumns();
+
+            BuildSelectString();
+
+            if (CurrentTables is not null)
+            {
+                CurrentTables.Clear();
+            }
+            UniqueColumns.Clear();
+        }
+
+        public SelectRequest(string command) : base(command)
+        {
+            isCommand = true;
         }
 
         private string FindTableOfColumn(string columnName)
         {
-            foreach (string tableName in FoundColumns.Keys)
+
+            foreach (string tableName in TableNames)
             {
-                if (FoundColumns[tableName].Contains(columnName))
+                if (Tables[tableName].isColumnPKey(columnName)) 
+                {
+                    return $"{tableName}.{columnName}";
+                }
+            }
+
+            foreach (string tableName in TableNames)
+            {
+                if (Tables[tableName].isTableConatinsColumn(columnName))
                 {
                     return $"{tableName}.{columnName}";
                 }
@@ -88,21 +86,103 @@ namespace StoreAPI.PostgreSQLProcsessing
             throw new Exception($"Column {columnName} hasn't found");
         }
 
+
+        private string BuildJoinString()
+        {
+            for (int i = 0; i < TableNames.Length - 1; i++)
+            {
+                for (int j = 1; j < TableNames.Length; j++)
+                {
+                    var intersection = Table.IntersectTables(Tables[TableNames[i]], Tables[TableNames[j]]);
+                    if (intersection is not null)
+                    {
+                        CurrentTables[TableNames[i]].Intersections.Add($"{TableNames[j]}.{intersection}");
+                        CurrentTables[TableNames[j]].Intersections.Add($"{TableNames[i]}.{intersection}");
+                    }
+                }
+            }
+
+            var sotrtedCurrentTables = (from table in TableNames
+                                        orderby CurrentTables[table].Intersections.Count
+                                        select table).ToArray();
+
+            string innerJoinString = $"{sotrtedCurrentTables[0]}";
+
+            int t = 0;
+            for (int j = sotrtedCurrentTables.Length - 1; j >= 0; j--)
+            {
+                if (CurrentTables[sotrtedCurrentTables[j]].Intersections.Count > 0)
+                {
+                    t = j;
+                    break;
+                }
+                else
+                {
+                    innerJoinString += $", {sotrtedCurrentTables[j]}";
+                }
+            }
+
+            innerJoinString += " ";
+
+            for (int i = 0; i < t; i++)
+            {
+                var intersections = CurrentTables[sotrtedCurrentTables[i]].Intersections;
+                foreach (var intersection in intersections)
+                {
+                    var secondTable = intersection.Split('.')[0];
+                    var columnName = intersection.Split('.')[1];
+                    if (RequestColumns is null || RequestColumns.Contains(columnName))
+                    {
+                        innerJoinString += $"join {secondTable} on {sotrtedCurrentTables[i]}.{columnName} = {intersection} ";
+                        CurrentTables[secondTable].Intersections.Remove($"{sotrtedCurrentTables[i]}.{columnName}");
+                    }
+                }
+            }
+
+            return innerJoinString;
+
+        }
+
+        private List<string> FindUniqueColumns()
+        {
+            var uniqueColumns = new HashSet<string>();
+
+            if (TableNames.Length > 1)
+            {
+                foreach (var name in TableNames)
+                {
+                    uniqueColumns = uniqueColumns.Union(Tables[name].ColumnNames).ToHashSet();
+                }
+            }
+
+            return uniqueColumns.ToList();
+        }
+
+
+
         private void BuildSelectString()
         {
-            if (RequestColumns is null)
+            if (TableNames.Length == 1)
             {
-                RequestColumns = UniqueColumns.ToArray();
+                var columns = RequestColumns == null ? "*" : String.Join(", ", RequestColumns);
+                Command = $"select {columns} from {TableNames[0]} {WhereCondition} {Limit}";
+                isCommand = true ;
             }
-
-            string[] columns = new string[RequestColumns.Length];
-
-            for (int i = 0; i < RequestColumns.Length; i++)
+            else
             {
-                columns[i] = FindTableOfColumn(RequestColumns[i]);
-            }
+                if (RequestColumns is null)
+                {
+                    RequestColumns = UniqueColumns.ToArray();
+                }
 
-            Command = $"select {String.Join(", ", columns)}";
+                for (int i = 0; i < RequestColumns.Length; i++)
+                {
+                    RequestColumns[i] = FindTableOfColumn(RequestColumns[i]);
+                }
+
+                //Command = $"select {String.Join(", ", RequestColumns)} from {InnerJoinString} {WhereCondition} {Limit}";
+            }
+            
         }
 
 
