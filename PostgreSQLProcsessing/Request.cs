@@ -15,7 +15,7 @@ namespace StoreAPI.PostgreSQLProcsessing
 
         static Request()
         {
-            RequiredKeys = new List<string>() { "tableNames"};
+            RequiredKeys = new List<string>() { "TableNames" };
 
             string server = "localhost";
             string port = "5432";
@@ -33,11 +33,11 @@ namespace StoreAPI.PostgreSQLProcsessing
 
         public Request(Dictionary<string, string> dict)
         {
-            CheckDictCorrection(dict);
-            TableNames = dict["tableNames"].Replace(" ", "").Split(',');
-            dict.Remove("tableNames");
+            CheckDictCorrection(dict, RequiredKeys);
+            TableNames = dict["TableNames"].Replace(" ", "").Split(',');
             CheckTableNamesRight();
             Command = String.Empty;
+            dict.Remove("TableNames");
         }
 
         public Request(string command)
@@ -71,7 +71,7 @@ namespace StoreAPI.PostgreSQLProcsessing
         private protected string BuildWhereConditionWithId(string tableName, string[] idList)
         {
             var list = from id in idList
-                       select $"{Tables[tableName].PrimaryKey} = {id}";
+                       select $"{Tables[tableName].PrimaryKey} = '{id}'";
             return $"where {String.Join(" or ", list)}";
         }
 
@@ -88,25 +88,26 @@ namespace StoreAPI.PostgreSQLProcsessing
         }
 
 
-        private protected static void CheckDictCorrection(Dictionary<string, string> dict)
+        private protected void CheckDictCorrection(Dictionary<string, string> dict, List<string> requiredKeys)
         {
             int requiredColumnsFound = 0;
+            char[] allowdSymbols = new char[] { ' ', ',', '.', '_', '=', '@', '\''};
             foreach (var key in dict.Keys)
             {
-                if (RequiredKeys.Contains(key)) { requiredColumnsFound++; }
+                if (requiredKeys.Contains(key)) { requiredColumnsFound++; }
 
                 string str = dict[key];
 
                 for (int i = 0; i < str.Length; i++)
                 {
-                    if (!(Char.IsDigit(str[i]) || str[i] == ' ' || str[i] == ',' || Char.IsLetter(str[i]) || str[i] == '_' || str[i] == '='))
+                    if (!(Char.IsDigit(str[i]) || Char.IsLetter(str[i]) || allowdSymbols.Contains(str[i])))
                     {
                         throw new Exception($"Symbol '{str[i]}' was incorrect. Use ',' as a delimetr.");
                     }
                 }
             }
 
-            if (requiredColumnsFound != RequiredKeys.Count)
+            if (requiredColumnsFound != requiredKeys.Count)
             {
                 throw new Exception($"Some required keys weren't found.\nList of required keys: [{String.Join(',', RequiredKeys)}]");
             }
@@ -126,7 +127,7 @@ namespace StoreAPI.PostgreSQLProcsessing
             var incorrectColumns = columnNames.Except(Tables[tableName].ColumnNames);
             if (incorrectColumns.Count() > 0)
             {
-                throw new Exception($"Some table names were incorrect. List of incorrect input: [{String.Join(',', incorrectColumns)}]");
+                throw new Exception($"Some column names were incorrect. List of incorrect input: [{String.Join(',', incorrectColumns)}]");
             }
         }
     }

@@ -15,38 +15,25 @@ namespace StoreAPI.PostgreSQLProcsessing
         public string WhereCondition { get; set; }
         public string InnerJoinString { get; set; }
         public string[]? RequestColumns { get; set; }
-        public string Limit { get; set; } 
+        public string Limit { get; set; }
         private List<string> UniqueColumns { get; set; }
-
         private Dictionary<string, Table> CurrentTables { get; set; }
-
-        static SelectRequest()
-        {
-            RequiredKeys.Add("columnNames");
-        }
+        private protected static new List<string> RequiredKeys { get; set; } = new List<string>() { "ColumnNames" };
 
         public SelectRequest(Dictionary<string, string> dict) : base(dict)
         {
+            //RequiredKeys.Add("ColumnNames");
+
+            CheckDictCorrection(dict, RequiredKeys);
+
             isCommand = false;
-            RequestColumns = String.IsNullOrWhiteSpace(dict["columnNames"]) ||
-                String.IsNullOrEmpty(dict["columnNames"]) ? null : dict["columnNames"].Replace(" ", "").Split(',');
+            RequestColumns = String.IsNullOrWhiteSpace(dict["ColumnNames"]) ||
+                String.IsNullOrEmpty(dict["ColumnNames"]) ? null : dict["ColumnNames"].Replace(" ", "").Split(',');
 
-            if(dict.Keys.Contains("isTable") && dict["isTable"] == "true")
-            {
+            FillCurrentTables(dict);
 
-            }
-            else
-            {
-                CurrentTables = new Dictionary<string, Table>();
-                foreach (var name in TableNames)
-                {
-                    Table table = (Table)Tables[name].Clone();
-                    CurrentTables[name] = table;
-                }
-            }
-
-            WhereCondition = dict.Keys.Contains("whereCondition") ? $"where {dict["whereCondition"]}" : String.Empty;
-            InnerJoinString = TableNames.Length == 1 ? "" : BuildJoinString(); 
+            WhereCondition = dict.Keys.Contains("WhereCondition") ? $"where {dict["WhereCondition"]}" : String.Empty;
+            InnerJoinString = TableNames.Length == 1 ? "" : BuildJoinString();
             Limit = dict.Keys.Contains("Limit") ? $"Limit {dict["Limit"]}" : String.Empty;
             UniqueColumns = FindUniqueColumns();
 
@@ -64,12 +51,29 @@ namespace StoreAPI.PostgreSQLProcsessing
             isCommand = true;
         }
 
+        private void FillCurrentTables(Dictionary<string, string> dict)
+        {
+            if (dict.Keys.Contains("isTable") && dict["isTable"] == "true")
+            {
+                return;
+            }
+            else
+            {
+                CurrentTables = new Dictionary<string, Table>();
+                foreach (var name in TableNames)
+                {
+                    Table table = (Table)Tables[name].Clone();
+                    CurrentTables[name] = table;
+                }
+            }
+        }
+
         private string FindTableOfColumn(string columnName)
         {
 
             foreach (string tableName in TableNames)
             {
-                if (Tables[tableName].isColumnPKey(columnName)) 
+                if (Tables[tableName].isColumnPKey(columnName))
                 {
                     return $"{tableName}.{columnName}";
                 }
@@ -166,7 +170,7 @@ namespace StoreAPI.PostgreSQLProcsessing
             {
                 var columns = RequestColumns == null ? "*" : String.Join(", ", RequestColumns);
                 Command = $"select {columns} from {TableNames[0]} {WhereCondition} {Limit}";
-                isCommand = true ;
+                isCommand = true;
             }
             else
             {
@@ -182,10 +186,11 @@ namespace StoreAPI.PostgreSQLProcsessing
 
                 //Command = $"select {String.Join(", ", RequestColumns)} from {InnerJoinString} {WhereCondition} {Limit}";
             }
-            
+
         }
 
 
-        public DataTable? Execute() => Request.Execute(Command, isReader:true);
+        public DataTable? Execute() => Request.Execute(Command, isReader: true);
     }
 }
+

@@ -87,9 +87,9 @@ namespace StoreAPI.PostgreSQLProcsessing
         private string[] FindColumns()
         {
             Dictionary<string, string> dict = new Dictionary<string, string>();
-            dict["tableNames"] = TableName;
+            dict["TableNames"] = TableName;
             dict["Limit"] = "1";
-            dict["columnNames"] = " ";
+            dict["ColumnNames"] = " ";
             dict["isTable"] = "true";
 
             var table = new SelectRequest(dict).Execute();

@@ -10,12 +10,13 @@ namespace StoreAPI.PostgreSQLProcsessing
         public string[] ColumnNames { get; set; }
         public string[] Values { get; set; }
 
-        static UpdateRequest2()
-        {
-            RequiredKeys.Add("Id");
-        }
+        private protected List<string> RequiredKeys { get; set; } = new List<string>() { "Id" };
+
+
         public UpdateRequest2(Dictionary<string, string> dict) : base(dict)
         {
+            //CheckDictCorrection(dict);
+
             CheckTableNamesLength(1);
             IdList = dict["Id"].Replace(" ", "").Split(',').ToArray();
             dict.Remove("Id");
@@ -23,7 +24,7 @@ namespace StoreAPI.PostgreSQLProcsessing
             CheckColumnNamesRight(TableNames[0], ColumnNames);
             WhereCondition = BuildWhereConditionWithId(TableNames[0], IdList);
             Values = (from key in dict.Keys
-                      select $"{key} = {dict[key]}").ToArray();
+                      select $"'{dict[key]}'").ToArray();
             Command = $"update {TableNames[0]} set ({String.Join(", ", ColumnNames)} values ({String.Join(", ", Values)})) {WhereCondition}";
         }
 
