@@ -15,7 +15,7 @@ namespace StoreAPI.PostgreSQLProcsessing
 
         public UpdateRequest2(Dictionary<string, string> dict) : base(dict)
         {
-            //CheckDictCorrection(dict);
+            CheckDictCorrection(dict, RequiredKeys);
 
             CheckTableNamesLength(1);
             IdList = dict["Id"].Replace(" ", "").Split(',').ToArray();
@@ -24,8 +24,8 @@ namespace StoreAPI.PostgreSQLProcsessing
             CheckColumnNamesRight(TableNames[0], ColumnNames);
             WhereCondition = BuildWhereConditionWithId(TableNames[0], IdList);
             Values = (from key in dict.Keys
-                      select $"'{dict[key]}'").ToArray();
-            Command = $"update {TableNames[0]} set ({String.Join(", ", ColumnNames)} values ({String.Join(", ", Values)})) {WhereCondition}";
+                      select $"{key} = '{dict[key]}'").ToArray();
+            Command = $"update {TableNames[0]} set {String.Join(",", Values)} {WhereCondition}";
         }
 
         public DataTable? Execute() => Request.Execute(Command, isReader: false);

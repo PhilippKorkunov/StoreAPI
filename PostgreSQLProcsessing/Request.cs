@@ -100,7 +100,8 @@ namespace StoreAPI.PostgreSQLProcsessing
 
                 for (int i = 0; i < str.Length; i++)
                 {
-                    if (!(Char.IsDigit(str[i]) || Char.IsLetter(str[i]) || allowdSymbols.Contains(str[i])))
+                    //if (!(Char.IsDigit(str[i]) || Char.IsLetter(str[i]) || allowdSymbols.Contains(str[i])))
+                    if(false)
                     {
                         throw new Exception($"Symbol '{str[i]}' was incorrect. Use ',' as a delimetr.");
                     }
