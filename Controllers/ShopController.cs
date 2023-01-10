@@ -98,8 +98,8 @@ namespace StoreAPI.Controllers
         public IActionResult SelectOrder(string idCustomer)
         {
             Dictionary<string, string> dict = new Dictionary<string, string>();
-            dict["TableNames"] = "store_order";
-            dict["ColumnNames"] = " ";
+            dict["TableNames"] = "store_order, product";
+            dict["ColumnNames"] = "id_product, title, price, id_order, id_customer";
             dict["WhereCondition"] = $"id_customer = '{idCustomer}'";
             var request = new SelectRequest(dict);
             return SqlRequestWithJson(method: "SelectCommand", command: request.Command);
