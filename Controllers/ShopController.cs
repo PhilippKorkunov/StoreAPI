@@ -83,6 +83,16 @@ namespace StoreAPI.Controllers
             return SqlRequestWithJson(method: "SelectCommand", command: request.Command);
         }
 
+        [HttpGet("SelectProductList")]
+        public IActionResult SelectProduct()
+        {
+            Dictionary<string, string> dict = new Dictionary<string, string>();
+            dict["TableNames"] = "product";
+            dict["ColumnNames"] = " ";
+            var request = new SelectRequest(dict);
+            return SqlRequestWithJson(method: "SelectCommand", command: request.Command);
+        }
+
 
         [HttpGet("SelectOrder")]
         public IActionResult SelectOrder(string idCustomer)
