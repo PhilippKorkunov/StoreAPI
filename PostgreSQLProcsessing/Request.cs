@@ -90,25 +90,7 @@ namespace StoreAPI.PostgreSQLProcsessing
 
         private protected void CheckDictCorrection(Dictionary<string, string> dict, List<string> requiredKeys)
         {
-            int requiredColumnsFound = 0;
-            char[] allowdSymbols = new char[] { ' ', ',', '.', '_', '=', '@', '\''};
-            foreach (var key in dict.Keys)
-            {
-                if (requiredKeys.Contains(key)) { requiredColumnsFound++; }
-
-                string str = dict[key];
-
-                for (int i = 0; i < str.Length; i++)
-                {
-                    //if (!(Char.IsDigit(str[i]) || Char.IsLetter(str[i]) || allowdSymbols.Contains(str[i])))
-                    if(false)
-                    {
-                        throw new Exception($"Symbol '{str[i]}' was incorrect. Use ',' as a delimetr.");
-                    }
-                }
-            }
-
-            if (requiredColumnsFound != requiredKeys.Count)
+            if ((requiredKeys.Except(dict.Keys)).Count() != 0)
             {
                 throw new Exception($"Some required keys weren't found.\nList of required keys: [{String.Join(',', RequiredKeys)}]");
             }

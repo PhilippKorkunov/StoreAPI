@@ -6,13 +6,10 @@ namespace StoreAPI.PostgreSQLProcsessing
     {
         public string WhereCondition { get; set; }
         public string[] IdList { get; set; }
-
+        private protected static new List<string> RequiredKeys { get; set; } = new List<string>() { "Id" };
         public DeleteRequest(Dictionary<string, string> dict) : base(dict)
         {
-            RequiredKeys.Add("Id");
-
-            //CheckDictCorrection(dict);
-
+            CheckDictCorrection(dict, RequiredKeys);
             CheckTableNamesLength(1);
             IdList = dict["Id"].Replace(" ", "").Split(',').ToArray();
             WhereCondition = BuildWhereConditionWithId(TableNames[0], IdList);

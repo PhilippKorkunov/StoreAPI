@@ -11,8 +11,28 @@ namespace StoreAPI.PostgreSQLProcsessing
     {
         private bool isCommand;
 
-        public override string Command { get => isCommand == true ? base.Command : $"select {String.Join(", ", RequestColumns)} from {InnerJoinString} {WhereCondition} {Limit}"; set => base.Command = value; }
-        public string WhereCondition { get; set; }
+        public override string Command 
+        { 
+            get => isCommand == true ? base.Command : TableNames.Length == 1 ? $"select {String.Join(", ", RequestColumns)} from {TableNames[0]} {WhereCondition} {Limit}" : 
+                $"select {String.Join(", ", RequestColumns)} from {InnerJoinString} {WhereCondition} {Limit}"; 
+            set => base.Command = value; 
+        }
+        public string WhereCondition { 
+            get => whereCondtion;
+            set 
+            {
+                if (String.IsNullOrEmpty(value) || value.Substring(0,5) == "where")
+                {
+                    whereCondtion = value;
+                }
+                else
+                {
+                    whereCondtion = $"where {value}";
+                }
+            } 
+        }
+
+        private string whereCondtion;
         public string InnerJoinString { get; set; }
         public string[]? RequestColumns { get; set; }
         public string Limit { get; set; }
@@ -22,8 +42,6 @@ namespace StoreAPI.PostgreSQLProcsessing
 
         public SelectRequest(Dictionary<string, string> dict) : base(dict)
         {
-            //RequiredKeys.Add("ColumnNames");
-
             CheckDictCorrection(dict, RequiredKeys);
 
             isCommand = false;
@@ -37,7 +55,7 @@ namespace StoreAPI.PostgreSQLProcsessing
             Limit = dict.Keys.Contains("Limit") ? $"Limit {dict["Limit"]}" : String.Empty;
             UniqueColumns = FindUniqueColumns();
 
-            BuildSelectString();
+            BuildSelectString(dict);
 
             if (CurrentTables is not null)
             {
@@ -164,13 +182,16 @@ namespace StoreAPI.PostgreSQLProcsessing
 
 
 
-        private void BuildSelectString()
+        private void BuildSelectString(Dictionary<string, string> dict)
         {
             if (TableNames.Length == 1)
             {
                 var columns = RequestColumns == null ? "*" : String.Join(", ", RequestColumns);
                 Command = $"select {columns} from {TableNames[0]} {WhereCondition} {Limit}";
-                isCommand = true;
+                if (dict.ContainsKey("isTable") && dict["isTable"] == "true")
+                {
+                    isCommand = true;
+                }
             }
             else
             {

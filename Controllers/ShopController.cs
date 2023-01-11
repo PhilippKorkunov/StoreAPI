@@ -7,9 +7,12 @@ using System.Text;
 using System.Reflection;
 using System.Xml.Linq;
 using System.Diagnostics.Eventing.Reader;
+//using Microsoft.AspNetCore.Cors;
+using System.Web.Http.Cors;
 
 namespace StoreAPI.Controllers
 {
+    [EnableCors("*","*","*")]
     [ApiController]
     [Route("api/[controller]")]
     public class StoreController : Controller
@@ -23,11 +26,11 @@ namespace StoreAPI.Controllers
 
         static StoreController()
         {
-           /* AdminRequest = new SelectRequest(CreateDict("SelectAdmin"));
-            CustomerRequest = new SelectRequest(CreateDict("SelectCustomer"));
-            OrderRequest = new SelectRequest(CreateDict("SelectOrder"));
-            ProductRequest = new SelectRequest(CreateDict("SelectProduct"));
-            LogRequest = new SelectRequest(CreateDict("SelectLog"));*/
+             AdminRequest = new SelectRequest(CreateDict("SelectAdmin"));
+             CustomerRequest = new SelectRequest(CreateDict("SelectCustomer"));
+             OrderRequest = new SelectRequest(CreateDict("SelectOrder"));
+             ProductRequest = new SelectRequest(CreateDict("SelectProductList"));
+             //LogRequest = new SelectRequest(CreateDict("SelectLog"));
         }
 
         private static Dictionary<string, string> CreateDict(string key)
@@ -40,14 +43,14 @@ namespace StoreAPI.Controllers
                     dict["ColumnNames"] = "email, password";
                     break;
                 case "SelectAdmin":
-                    dict["TableNames"] = "customer";
+                    dict["TableNames"] = "administrator";
                     dict["ColumnNames"] = "login, password";
                     break;
                 case "SelectOrder":
-                    dict["TableNames"] = "customer";
-                    dict["ColumnNames"] = " ";
+                    dict["TableNames"] = "store_order, product";
+                    dict["ColumnNames"] = "id_product, title, price, id_order, id_customer";
                     break;
-                case "SelectProduct":
+                case "SelectProductList":
                     dict["TableNames"] = "product";
                     dict["ColumnNames"] = " ";
                     break;
@@ -69,69 +72,73 @@ namespace StoreAPI.Controllers
             Dictionary<string, string> dict = new Dictionary<string, string>();
             /* dict["TableNames"] = "product, category, store_order";
              dict["columnNames"] = " ";*/
-            return SqlRequestWithJson(method: "SelectDict", dict: dict);
+            return GetExecuteResult(method: "SelectDict", dict: dict);
         }
 
         [HttpGet("SelectUser")]
         public IActionResult SelectUser(string login, string password, bool isAdmin)
         {
-            Dictionary<string, string> dict = new Dictionary<string, string>();
-            dict["TableNames"] = isAdmin ? "administrator" : "customer";
-            dict["ColumnNames"] = isAdmin ? "login, password" : "email, password";
-            dict["WhereCondition"] = isAdmin ? $"login = '{login}' and password = '{password}'" : $"email = '{login}'and password = '{password}'";
-            var request = new SelectRequest(dict);
-            return SqlRequestWithJson(method: "SelectCommand", command: request.Command);
+            if(isAdmin)
+            {
+                AdminRequest.WhereCondition = $"login = '{login}' and password = '{password}'";
+                return GetExecuteResult(method: "SelectStaticCommand", selectRequest: AdminRequest);
+            }
+            else
+            {
+                CustomerRequest.WhereCondition = $"email = '{login}'and password = '{password}'";
+                return GetExecuteResult(method: "SelectStaticCommand", selectRequest: CustomerRequest);
+            }
         }
 
         [HttpGet("SelectProductList")]
-        public IActionResult SelectProduct()
-        {
-            Dictionary<string, string> dict = new Dictionary<string, string>();
-            dict["TableNames"] = "product";
-            dict["ColumnNames"] = " ";
-            var request = new SelectRequest(dict);
-            return SqlRequestWithJson(method: "SelectCommand", command: request.Command);
-        }
+        public IActionResult SelectProductList() => GetExecuteResult(method: "SelectStaticCommand", selectRequest: ProductRequest);
 
 
         [HttpGet("SelectOrder")]
         public IActionResult SelectOrder(string idCustomer)
         {
-            Dictionary<string, string> dict = new Dictionary<string, string>();
-            dict["TableNames"] = "store_order, product";
-            dict["ColumnNames"] = "id_product, title, price, id_order, id_customer";
-            dict["WhereCondition"] = $"id_customer = '{idCustomer}'";
-            var request = new SelectRequest(dict);
-            return SqlRequestWithJson(method: "SelectCommand", command: request.Command);
+            OrderRequest.WhereCondition = $"id_customer = '{idCustomer}'";
+            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: OrderRequest);
         }
 
+
+        [HttpPost]
+        public IActionResult PushOrder()
+        {
+
+            return Ok();
+        }
+
+
+
         [HttpPost("Insert")]
-        public IActionResult Insert(JsonDocument jsonDocument) => SqlRequestWithJson(jsonDocument: jsonDocument, method: "Insert");
+        public IActionResult Insert(JsonDocument jsonDocument) => GetExecuteResult(jsonDocument: jsonDocument, method: "Insert");
 
         [HttpPost("Insert2")]
-        public IActionResult Insert2(JsonDocument jsonDocument) => SqlRequestWithJson(jsonDocument: jsonDocument, method: "Insert2");
+        public IActionResult Insert2(JsonDocument jsonDocument) => GetExecuteResult(jsonDocument: jsonDocument, method: "Insert2");
 
         [HttpPut("Update")]
-        public IActionResult Update(JsonDocument jsonDocument) => SqlRequestWithJson(jsonDocument: jsonDocument, method: "Update");
+        public IActionResult Update(JsonDocument jsonDocument) => GetExecuteResult(jsonDocument: jsonDocument, method: "Update");
 
         [HttpPut("Update2")]
-        public IActionResult Update2(JsonDocument jsonDocument) => SqlRequestWithJson(jsonDocument: jsonDocument, method: "Update2");
+        public IActionResult Update2(JsonDocument jsonDocument) => GetExecuteResult(jsonDocument: jsonDocument, method: "Update2");
 
         [HttpDelete("Delete")]
-        public IActionResult Delete(JsonDocument jsonDocument) => SqlRequestWithJson(jsonDocument: jsonDocument, method: "Delete");
+        public IActionResult Delete(JsonDocument jsonDocument) => GetExecuteResult(jsonDocument: jsonDocument, method: "Delete");
 
 
-        private IActionResult SqlRequestWithJson(JsonDocument? jsonDocument = null, Dictionary<string, string>? dict = null, string? method = null, string? command = null)
+        private IActionResult GetExecuteResult(JsonDocument? jsonDocument = null, Dictionary<string, string>? dict = null, 
+            string? method = null, string? command = null, SelectRequest? selectRequest = null)
         {
             if (method is null) { return BadRequest("Method is null"); }
 
             try
             {
-                if (jsonDocument is not null || dict is not null || command is not null)
+                if (jsonDocument is not null || dict is not null || command is not null || selectRequest is not null)
                 {
                     string json = ToJsonString(jsonDocument);
                     dict = dict is null ? JsonConvert.DeserializeObject<Dictionary<string, string>>(json) : dict;
-                    if (dict is not null || command is not null)
+                    if (dict is not null || command is not null || selectRequest is not null)
                     {
                         switch (method)
                         {
@@ -145,18 +152,22 @@ namespace StoreAPI.Controllers
                                     return Ok(JsonConvert.SerializeObject(selectCommandRequest.Execute()));
                                 }
                                 return BadRequest($"Command is null");
+                            case "SelectStaticCommand":
+                                if (selectRequest is not null)
+                                {
+                                    return Ok(JsonConvert.SerializeObject(selectRequest.Execute()));
+                                }
+                                return BadRequest("Select Request is null");
                             case "Delete":
                                 DeleteRequest deleteRequest = new DeleteRequest(dict);
                                 return Ok(deleteRequest.Execute());
                             case "Insert":
                                 InsertRequest insertRequest = new InsertRequest(dict);
                                 insertRequest.Execute();
-                                break;
-                            //return Ok(insertRequest.Execute());
+                                return Ok(insertRequest.Execute());
                             case "Insert2":
                                 InsertRequest2 insertRequest2 = new InsertRequest2(dict);
                                 return Ok(insertRequest2.Execute());
-                            //return Ok(insertRequest2.Execute());
                             case "Update":
                                 UpdateRequest updateRequest = new UpdateRequest(dict);
                                 return Ok(updateRequest.Execute());
@@ -170,7 +181,7 @@ namespace StoreAPI.Controllers
                     }
                     return BadRequest("Dictionary of inputed json is null");
                 }
-                return BadRequest("Dictionaty or Json or Command is null");
+                return BadRequest("Json is null");
             }
             catch (Exception ex)
             {

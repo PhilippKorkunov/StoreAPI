@@ -7,12 +7,7 @@ namespace StoreAPI.PostgreSQLProcsessing
         public string[] ColumnNames { get; set; }
         public string[] Values { get; set; }
 
-        private protected static new List<string> RequiredKeys { get; set; }
-
-        static InsertRequest2()
-        {
-            RequiredKeys = new List<string>();
-        }
+        private protected static new List<string> RequiredKeys { get; set; } = new List<string>();
 
         public InsertRequest2(Dictionary<string, string> dict) : base(dict)
         {
