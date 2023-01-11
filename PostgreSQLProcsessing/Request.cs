@@ -20,8 +20,8 @@ namespace StoreAPI.PostgreSQLProcsessing
             string server = "localhost";
             string port = "5432";
             string username = "postgres";
-            string password = "qwe123@";
-            string dataBase = "StoreDB";
+            string password = "ssppoorrtt58";
+            string dataBase = "store";
             ConnectionString = $"Server={server}; Port={port}; User Id={username}; Password={password}; Database={dataBase}";
             AllTableNames = Table.FindAllTableNames();
             Tables = new Dictionary<string, Table>();
