@@ -45,6 +45,12 @@ namespace StoreAPI.PostgreSQLProcsessing
             Command = command;
         }
 
+        public Request(string[] tableNames)
+        {
+            TableNames = tableNames;
+            Command = String.Empty;
+        }
+
 
         private protected static DataTable? Execute(string cmd, bool isReader = false)
         {

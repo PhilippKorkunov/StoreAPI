@@ -12,6 +12,7 @@ using System.Web.Http.Cors;
 
 namespace StoreAPI.Controllers
 {
+
     [EnableCors("*","*","*")]
     [ApiController]
     [Route("api/[controller]")]
@@ -20,6 +21,7 @@ namespace StoreAPI.Controllers
         private static SelectRequest AdminRequest { get; set; }
         private static SelectRequest CustomerRequest { get; set; }
         private static SelectRequest OrderRequest { get; set; }
+        //private SelectRequest? SelectedOrderRequest { get; set; } = null;
         private static SelectRequest ProductRequest { get; set; }
         private static SelectRequest LogRequest { get; set; }
 
@@ -52,7 +54,7 @@ namespace StoreAPI.Controllers
                     break;
                 case "SelectProductList":
                     dict["TableNames"] = "product";
-                    dict["ColumnNames"] = " ";
+                    dict["ColumnNames"] = "";
                     break;
                 case "SelectLog":
                     //dict["TableNames"] = "main_log, product_log, product, customer";
@@ -91,7 +93,7 @@ namespace StoreAPI.Controllers
         }
 
         [HttpGet("SelectProductList")]
-        public IActionResult SelectProductList() => GetExecuteResult(method: "SelectStaticCommand", selectRequest: ProductRequest);
+        public IActionResult SelectProductList() => GetExecuteResult(method: "SelectStaticCommand", selectRequest: (SelectRequest)ProductRequest.Clone());
 
 
         [HttpGet("SelectOrder")]

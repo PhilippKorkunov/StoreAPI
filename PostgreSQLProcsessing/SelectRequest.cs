@@ -7,21 +7,29 @@ using static Npgsql.Replication.PgOutput.Messages.RelationMessage;
 
 namespace StoreAPI.PostgreSQLProcsessing
 {
-    public class SelectRequest : Request
+    public class SelectRequest : Request, ICloneable
     {
         private bool isCommand;
 
         public override string Command 
-        { 
-            get => isCommand == true ? base.Command : TableNames.Length == 1 ? $"select {String.Join(", ", RequestColumns)} from {TableNames[0]} {WhereCondition} {Limit}" : 
-                $"select {String.Join(", ", RequestColumns)} from {InnerJoinString} {WhereCondition} {Limit}"; 
+        {
+            get
+            {
+                if (isCommand) return base.Command;
+                if (TableNames.Length == 1) { return $"select {String.Join(", ", RequestColumns)} from {TableNames[0]} {WhereCondition} {Limit}"; }
+                return  $"select {String.Join(", ", RequestColumns)} from {InnerJoinString} {WhereCondition} {Limit}";
+            }
             set => base.Command = value; 
         }
         public string WhereCondition { 
             get => whereCondtion;
             set 
             {
-                if (String.IsNullOrEmpty(value) || value.Substring(0,5) == "where")
+                if (String.IsNullOrEmpty(value))
+                {
+                    whereCondtion = string.Empty;
+                }
+                else if (value.Substring(0, 5) == "where")
                 {
                     whereCondtion = value;
                 }
@@ -38,22 +46,33 @@ namespace StoreAPI.PostgreSQLProcsessing
         public string Limit { get; set; }
         private List<string> UniqueColumns { get; set; }
         private Dictionary<string, Table> CurrentTables { get; set; }
-        private protected static new List<string> RequiredKeys { get; set; } = new List<string>() { "ColumnNames" };
+        public static new List<string> RequiredKeys { get; set; } = new List<string>() { "ColumnNames" };
 
         public SelectRequest(Dictionary<string, string> dict) : base(dict)
         {
             CheckDictCorrection(dict, RequiredKeys);
 
             isCommand = false;
-            RequestColumns = String.IsNullOrWhiteSpace(dict["ColumnNames"]) ||
-                String.IsNullOrEmpty(dict["ColumnNames"]) ? null : dict["ColumnNames"].Replace(" ", "").Split(',');
+
+            if (dict.Keys.Contains("isTable") && dict["isTable"] == "true")
+            {
+                RequestColumns = String.IsNullOrWhiteSpace(dict["ColumnNames"]) ||
+               String.IsNullOrEmpty(dict["ColumnNames"]) ? null : dict["ColumnNames"].Replace(" ", "").Split(',');
+                
+            }
+            else
+            {
+                UniqueColumns = FindUniqueColumns();
+                RequestColumns = String.IsNullOrWhiteSpace(dict["ColumnNames"]) ||
+                String.IsNullOrEmpty(dict["ColumnNames"]) ? UniqueColumns.ToArray() : dict["ColumnNames"].Replace(" ", "").Split(',');
+                UniqueColumns.Clear();
+            }
 
             FillCurrentTables(dict);
 
             WhereCondition = dict.Keys.Contains("WhereCondition") ? $"where {dict["WhereCondition"]}" : String.Empty;
             InnerJoinString = TableNames.Length == 1 ? "" : BuildJoinString();
             Limit = dict.Keys.Contains("Limit") ? $"Limit {dict["Limit"]}" : String.Empty;
-            UniqueColumns = FindUniqueColumns();
 
             BuildSelectString(dict);
 
@@ -61,12 +80,27 @@ namespace StoreAPI.PostgreSQLProcsessing
             {
                 CurrentTables.Clear();
             }
-            UniqueColumns.Clear();
         }
 
         public SelectRequest(string command) : base(command)
         {
             isCommand = true;
+        }
+
+        public SelectRequest(string[] tableNames, string[]? requestColumns, string innerJoinString, 
+            string whereCondition, string limit) : base(tableNames) 
+        {
+            isCommand = false;
+            RequestColumns = requestColumns;
+            WhereCondition = whereCondition;
+            InnerJoinString = innerJoinString;
+            Limit = limit;
+            //Command = request.Command;
+        }
+
+        public object Clone()
+        {
+            return new SelectRequest(TableNames, RequestColumns, InnerJoinString, WhereCondition, Limit);
         }
 
         private void FillCurrentTables(Dictionary<string, string> dict)
@@ -175,9 +209,10 @@ namespace StoreAPI.PostgreSQLProcsessing
                 {
                     uniqueColumns = uniqueColumns.Union(Tables[name].ColumnNames).ToHashSet();
                 }
+                return uniqueColumns.ToList();
             }
-
-            return uniqueColumns.ToList();
+            
+            return Tables[TableNames[0]].ColumnNames.ToList();
         }
 
 
@@ -186,12 +221,9 @@ namespace StoreAPI.PostgreSQLProcsessing
         {
             if (TableNames.Length == 1)
             {
+                isCommand = true;
                 var columns = RequestColumns == null ? "*" : String.Join(", ", RequestColumns);
                 Command = $"select {columns} from {TableNames[0]} {WhereCondition} {Limit}";
-                if (dict.ContainsKey("isTable") && dict["isTable"] == "true")
-                {
-                    isCommand = true;
-                }
             }
             else
             {
