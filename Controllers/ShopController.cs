@@ -32,7 +32,7 @@ namespace StoreAPI.Controllers
              CustomerRequest = new SelectRequest(CreateDict("SelectCustomer"));
              OrderRequest = new SelectRequest(CreateDict("SelectOrder"));
              ProductRequest = new SelectRequest(CreateDict("SelectProductList"));
-             //LogRequest = new SelectRequest(CreateDict("SelectLog"));
+             LogRequest = new SelectRequest(CreateDict("SelectLog"));
         }
 
         private static Dictionary<string, string> CreateDict(string key)
@@ -42,11 +42,11 @@ namespace StoreAPI.Controllers
             {
                 case "SelectCustomer":
                     dict["TableNames"] = "customer";
-                    dict["ColumnNames"] = "email, password";
+                    dict["ColumnNames"] = "id_customer, email, password, name, surname, patronymic";
                     break;
                 case "SelectAdmin":
                     dict["TableNames"] = "administrator";
-                    dict["ColumnNames"] = "login, password";
+                    dict["ColumnNames"] = "email, password";
                     break;
                 case "SelectOrder":
                     dict["TableNames"] = "store_order, product";
@@ -57,8 +57,8 @@ namespace StoreAPI.Controllers
                     dict["ColumnNames"] = "";
                     break;
                 case "SelectLog":
-                    //dict["TableNames"] = "main_log, product_log, product, customer";
-                    //dict["columnNames"] = " ";
+                    dict["TableNames"] = "main_log, product_log, product, customer";
+                    dict["ColumnNames"] = "id_log, datetime, id_product_log, id_product, title, price, id_customer, email";
                     break;
                 default:
                     break;
@@ -80,16 +80,9 @@ namespace StoreAPI.Controllers
         [HttpGet("SelectUser")]
         public IActionResult SelectUser(string login, string password, bool isAdmin)
         {
-            if(isAdmin)
-            {
-                AdminRequest.WhereCondition = $"login = '{login}' and password = '{password}'";
-                return GetExecuteResult(method: "SelectStaticCommand", selectRequest: AdminRequest);
-            }
-            else
-            {
-                CustomerRequest.WhereCondition = $"email = '{login}'and password = '{password}'";
-                return GetExecuteResult(method: "SelectStaticCommand", selectRequest: CustomerRequest);
-            }
+            var requst = isAdmin? (SelectRequest)AdminRequest.Clone() : (SelectRequest)CustomerRequest.Clone();
+            requst.WhereCondition = $"email = '{login}' and password = '{password}'";
+            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: requst);
         }
 
         [HttpGet("SelectProductList")]
@@ -99,8 +92,9 @@ namespace StoreAPI.Controllers
         [HttpGet("SelectOrder")]
         public IActionResult SelectOrder(string idCustomer)
         {
-            OrderRequest.WhereCondition = $"id_customer = '{idCustomer}'";
-            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: OrderRequest);
+            var requst = (SelectRequest)OrderRequest.Clone();
+            requst.WhereCondition = $"id_customer = '{idCustomer}'";
+            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: requst);
         }
 
 
@@ -157,7 +151,7 @@ namespace StoreAPI.Controllers
                             case "SelectStaticCommand":
                                 if (selectRequest is not null)
                                 {
-                                    return Ok(JsonConvert.SerializeObject(selectRequest.Execute()));
+                                    return Ok(JsonConvert.SerializeObject(selectRequest.Command));
                                 }
                                 return BadRequest("Select Request is null");
                             case "Delete":

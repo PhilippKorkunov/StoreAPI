@@ -182,7 +182,8 @@ namespace StoreAPI.PostgreSQLProcsessing
 
             for (int i = 0; i < t; i++)
             {
-                var intersections = CurrentTables[sotrtedCurrentTables[i]].Intersections;
+                var intersections = new List<string>();
+                intersections.AddRange(CurrentTables[sotrtedCurrentTables[i]].Intersections);
                 foreach (var intersection in intersections)
                 {
                     var secondTable = intersection.Split('.')[0];
