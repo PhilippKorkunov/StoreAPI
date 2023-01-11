@@ -101,7 +101,7 @@ namespace StoreAPI.Controllers
         [HttpGet("SelectLog")]
         public IActionResult SelectLog()
         {
-            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: LogRequest);
+            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: (SelectRequest)LogRequest.Clone());
         }
     
 
