@@ -32,7 +32,7 @@ namespace StoreAPI.Controllers
              CustomerRequest = new SelectRequest(CreateDict("SelectCustomer"));
              OrderRequest = new SelectRequest(CreateDict("SelectOrder"));
              ProductRequest = new SelectRequest(CreateDict("SelectProductList"));
-             //LogRequest = new SelectRequest(CreateDict("SelectLog"));
+             LogRequest = new SelectRequest(CreateDict("SelectLog"));
         }
 
         private static Dictionary<string, string> CreateDict(string key)
@@ -42,7 +42,7 @@ namespace StoreAPI.Controllers
             {
                 case "SelectCustomer":
                     dict["TableNames"] = "customer";
-                    dict["ColumnNames"] = "email, password";
+                    dict["ColumnNames"] = "id_customer, email, password";
                     break;
                 case "SelectAdmin":
                     dict["TableNames"] = "administrator";
@@ -57,8 +57,8 @@ namespace StoreAPI.Controllers
                     dict["ColumnNames"] = "";
                     break;
                 case "SelectLog":
-                    //dict["TableNames"] = "main_log, product_log, product, customer";
-                    //dict["columnNames"] = " ";
+                    dict["TableNames"] = "main_log, product_log, product, customer";
+                    dict["ColumnNames"] = "id_log, datetime, id_product_log, id_product, title, price, id_customer, email";
                     break;
                 default:
                     break;
@@ -103,6 +103,12 @@ namespace StoreAPI.Controllers
             return GetExecuteResult(method: "SelectStaticCommand", selectRequest: OrderRequest);
         }
 
+        [HttpGet("SelectLog")]
+        public IActionResult SelectLog()
+        {
+            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: LogRequest);
+        }
+    
 
         [HttpPost]
         public IActionResult PushOrder()

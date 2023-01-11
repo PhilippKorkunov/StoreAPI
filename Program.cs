@@ -14,16 +14,11 @@ builder.Services.AddCors(options =>
                           builder.WithOrigins("http://localhost:3000/")
                           .AllowAnyOrigin()
                           .AllowAnyMethod()
-                          .AllowAnyHeader();
+                          .AllowAnyHeader()
+                          .WithHeaders().AllowAnyMethod();
                       });
 });
 
-builder.Services.AddCors(o => o.AddPolicy("MyPolicy", builder =>
-{
-    builder.AllowAnyOrigin()
-        .AllowAnyMethod()
-        .AllowAnyHeader();
-}));
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -45,6 +40,11 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.UseCors(options => options.AllowAnyOrigin());
+app.UseCors(options =>
+{
+    options.AllowAnyOrigin()
+    .AllowAnyMethod()
+    .AllowAnyHeader();
+});
 
 app.Run();
