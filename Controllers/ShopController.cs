@@ -43,6 +43,7 @@ namespace StoreAPI.Controllers
                 case "SelectCustomer":
                     dict["TableNames"] = "customer";
                     dict["ColumnNames"] = "id_customer, email, password, name, surname, patronymic";
+                    dict["ColumnNames"] = "id_customer, email, password";
                     break;
                 case "SelectAdmin":
                     dict["TableNames"] = "administrator";
@@ -97,6 +98,12 @@ namespace StoreAPI.Controllers
             return GetExecuteResult(method: "SelectStaticCommand", selectRequest: requst);
         }
 
+        [HttpGet("SelectLog")]
+        public IActionResult SelectLog()
+        {
+            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: LogRequest);
+        }
+    
 
         [HttpPost]
         public IActionResult PushOrder()
