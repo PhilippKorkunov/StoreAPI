@@ -198,7 +198,7 @@ namespace StoreAPI.Controllers
                             case "SelectStaticCommand":
                                 if (selectRequest is not null)
                                 {
-                                    return Ok(JsonConvert.SerializeObject(selectRequest.Command));
+                                    return Ok(JsonConvert.SerializeObject(selectRequest.Execute()));
                                 }
                                 return BadRequest("Select Request is null");
                             case "SelectStaticOrderCommand":
