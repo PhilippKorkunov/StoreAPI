@@ -115,24 +115,27 @@ namespace StoreAPI.Controllers
                 var productIdArray = (from DataRow row in OrderTable.Rows
                                      select new List<object>() { row["id_product"], row["id_order"] }).ToList();
 
+                //return Ok(productIdArray);
+
                 Dictionary<string, string> dict = new Dictionary<string, string>();
                 dict["TableNames"] = "main_log";
                 dict["datetime"] = DateTime.Now.ToString();
+                dict["id_customer"] = idCustomer;
+                dict["id_order"] = productIdArray[0][1].ToString();
+                new InsertRequest2(dict).Execute();
+
+                new InsertRequest2(dict).Execute();
+
+                Dictionary<string, string> selectDict = new Dictionary<string, string>();
+                selectDict["TableNames"] = "main_log";
+                selectDict["ColumnNames"] = "";
+                selectDict["WhereCondition"] = $"id_order = '{dict["id_order"]}'";
+
+                DataRow tableRow = new SelectRequest(selectDict).Execute().Rows[0];
+                string idLog = tableRow["id_log"].ToString();
 
                 foreach (var product in productIdArray) 
                 {
-                    dict["id_customer"] = idCustomer;
-                    dict["id_order"] = product[1].ToString();
-                    new InsertRequest2(dict).Execute();
-
-                    Dictionary<string, string> selectDict = new Dictionary<string, string>();
-                    selectDict["TableNames"] = "main_log";
-                    selectDict["ColumnNames"] = "";
-                    selectDict["WhereCondition"] = $"id_order = '{dict["id_order"]}'";
-
-                    DataRow row = new SelectRequest(selectDict).Execute().Rows[0];
-                    string idLog = row["id_log"].ToString();
-
                     dict["TableNames"] = "product_log";
                     dict["id_log"] = idLog;
                     dict["id_product"] = product[0].ToString();
@@ -195,7 +198,7 @@ namespace StoreAPI.Controllers
                             case "SelectStaticCommand":
                                 if (selectRequest is not null)
                                 {
-                                    return Ok(JsonConvert.SerializeObject(selectRequest.Execute()));
+                                    return Ok(JsonConvert.SerializeObject(selectRequest.Command));
                                 }
                                 return BadRequest("Select Request is null");
                             case "SelectStaticOrderCommand":
