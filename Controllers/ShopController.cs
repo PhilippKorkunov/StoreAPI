@@ -45,7 +45,6 @@ namespace StoreAPI.Controllers
                 case "SelectCustomer":
                     dict["TableNames"] = "customer";
                     dict["ColumnNames"] = "id_customer, email, password, name, surname, patronymic";
-                    dict["ColumnNames"] = "id_customer, email, password";
                     break;
                 case "SelectAdmin":
                     dict["TableNames"] = "administrator";
@@ -114,7 +113,7 @@ namespace StoreAPI.Controllers
             if (OrderTable is not null) 
             {
                 var productIdArray = (from DataRow row in OrderTable.Rows
-                                     select new List<object>() { row["id_product"], row["id_product"] }).ToList();
+                                     select new List<object>() { row["id_product"], row["id_order"] }).ToList();
 
                 Dictionary<string, string> dict = new Dictionary<string, string>();
                 dict["TableNames"] = "main_log";
