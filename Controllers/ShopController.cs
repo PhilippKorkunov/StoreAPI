@@ -107,7 +107,7 @@ namespace StoreAPI.Controllers
         }
     
 
-        [HttpPost]
+        [HttpPost("PushOrder")]
         public IActionResult PushOrder(string idCustomer)
         {
             SelectOrder(idCustomer);
