@@ -9,6 +9,7 @@ using System.Xml.Linq;
 using System.Diagnostics.Eventing.Reader;
 //using Microsoft.AspNetCore.Cors;
 using System.Web.Http.Cors;
+using System.Data;
 
 namespace StoreAPI.Controllers
 {
@@ -21,7 +22,7 @@ namespace StoreAPI.Controllers
         private static SelectRequest AdminRequest { get; set; }
         private static SelectRequest CustomerRequest { get; set; }
         private static SelectRequest OrderRequest { get; set; }
-        //private SelectRequest? SelectedOrderRequest { get; set; } = null;
+        private DataTable? OrderTable { get; set; }
         private static SelectRequest ProductRequest { get; set; }
         private static SelectRequest LogRequest { get; set; }
 
@@ -95,7 +96,7 @@ namespace StoreAPI.Controllers
         {
             var requst = (SelectRequest)OrderRequest.Clone();
             requst.WhereCondition = $"id_customer = '{idCustomer}'";
-            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: requst);
+            return GetExecuteResult(method: "SelectStaticOrderCommand", selectRequest: requst);
         }
 
         [HttpGet("SelectLog")]
@@ -106,10 +107,28 @@ namespace StoreAPI.Controllers
     
 
         [HttpPost]
-        public IActionResult PushOrder()
+        public IActionResult PushOrder(string idCustomer)
         {
+            SelectOrder(idCustomer);
+            if (OrderTable is not null) 
+            {
+                var productIdArray = (from DataRow row in OrderTable.Rows
+                                     select new List<object>() { row["id_product"], row["id_product"] }).ToList();
 
-            return Ok();
+                Dictionary<string, string> dict = new Dictionary<string, string>();
+                dict["TableNames"] = "main_log";
+                dict["datetime"] = DateTime.Now.ToString();
+
+                foreach (var product in productIdArray) 
+                {
+                    dict["id_product"] = product[0].ToString();
+                    dict["id_order"] = product[1].ToString();
+                    InsertRequest2 insertRequest2 = new InsertRequest2(dict);
+                }
+                return Ok(); 
+            }
+
+            return BadRequest();
         }
 
 
@@ -158,7 +177,14 @@ namespace StoreAPI.Controllers
                             case "SelectStaticCommand":
                                 if (selectRequest is not null)
                                 {
-                                    return Ok(JsonConvert.SerializeObject(selectRequest.Command));
+                                    return Ok(JsonConvert.SerializeObject(selectRequest.Execute()));
+                                }
+                                return BadRequest("Select Request is null");
+                            case "SelectStaticOrderCommand":
+                                if (selectRequest is not null)
+                                {
+                                    OrderTable = selectRequest.Execute();
+                                    return Ok(JsonConvert.SerializeObject(OrderTable));
                                 }
                                 return BadRequest("Select Request is null");
                             case "Delete":
