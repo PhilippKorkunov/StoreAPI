@@ -98,7 +98,7 @@ namespace StoreAPI.PostgreSQLProcsessing
         {
             if ((requiredKeys.Except(dict.Keys)).Count() != 0)
             {
-                throw new Exception($"Some required keys weren't found.\nList of required keys: [{String.Join(',', RequiredKeys)}]");
+                throw new Exception($"Some required keys weren't found.\nList of required keys: [{String.Join(',', requiredKeys)}]");
             }
         }
 
