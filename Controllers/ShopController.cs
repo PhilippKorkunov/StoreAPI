@@ -121,27 +121,25 @@ namespace StoreAPI.Controllers
                 dict["TableNames"] = "main_log";
                 dict["datetime"] = DateTime.Now.ToString();
                 dict["id_customer"] = idCustomer;
-                dict["id_order"] = productIdArray[0][1].ToString();
-                new InsertRequest2(dict).Execute();
-
                 new InsertRequest2(dict).Execute();
 
                 Dictionary<string, string> selectDict = new Dictionary<string, string>();
                 selectDict["TableNames"] = "main_log";
                 selectDict["ColumnNames"] = "";
-                selectDict["WhereCondition"] = $"id_order = '{dict["id_order"]}'";
+                selectDict["WhereCondition"] = $"datetime = '{dict["datetime"]}'";
 
                 DataRow tableRow = new SelectRequest(selectDict).Execute().Rows[0];
                 string idLog = tableRow["id_log"].ToString();
+
+                dict.Remove("datetime");
+                dict.Remove("id_customer");
 
                 foreach (var product in productIdArray) 
                 {
                     dict["TableNames"] = "product_log";
                     dict["id_log"] = idLog;
                     dict["id_product"] = product[0].ToString();
-                    dict.Remove("id_order");
-                    dict.Remove("datetime");
-                    dict.Remove("id_customer");
+                    dict["id_order"] = product[1].ToString();
 
                     new InsertRequest2(dict).Execute();
 
