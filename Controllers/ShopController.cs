@@ -10,6 +10,7 @@ using System.Diagnostics.Eventing.Reader;
 //using Microsoft.AspNetCore.Cors;
 using System.Web.Http.Cors;
 using System.Data;
+using System.Web.Http.Dispatcher;
 
 namespace StoreAPI.Controllers
 {
@@ -123,7 +124,23 @@ namespace StoreAPI.Controllers
                 {
                     dict["id_product"] = product[0].ToString();
                     dict["id_order"] = product[1].ToString();
-                    InsertRequest2 insertRequest2 = new InsertRequest2(dict);
+                    new InsertRequest2(dict).Execute();
+                    dict.Clear();
+
+                    Dictionary<string, string> selectDict = new Dictionary<string, string>();
+                    selectDict["TableNames"] = dict["TableNames"];
+                    selectDict["ColumnNames"] = "";
+                    selectDict["WhereCondition"] = $"id_order = '{dict["id_order"]}'";
+
+                    DataRow row = new SelectRequest(dict).Execute().Rows[0];
+                    string idLog = row["id_log"].ToString();
+
+                    dict["TableNames"] = "product_log";
+                    dict["id_log"] = idLog;
+                    dict.Remove("id_order");
+
+                    new InsertRequest2(dict).Execute();
+
                 }
                 return Ok(); 
             }
