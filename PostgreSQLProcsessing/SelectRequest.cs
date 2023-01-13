@@ -154,14 +154,6 @@ namespace StoreAPI.PostgreSQLProcsessing
                     {
                         CurrentTables[TableNames[i]].Intersections.Add($"{TableNames[j]}.{intersection}");
                         CurrentTables[TableNames[j]].Intersections.Add($"{TableNames[i]}.{intersection}");
-                        /*if (!CurrentTables[TableNames[i]].Intersections.Contains($"{TableNames[j]}.{intersection}"))
-                        {
-                            CurrentTables[TableNames[i]].Intersections.Add($"{TableNames[j]}.{intersection}");
-                        }
-                        if (!CurrentTables[TableNames[j]].Intersections.Contains($"{TableNames[i]}.{intersection}"))
-                        {
-                            CurrentTables[TableNames[j]].Intersections.Add($"{TableNames[i]}.{intersection}");
-                        }*/
                     }
                 }
             }
@@ -190,7 +182,6 @@ namespace StoreAPI.PostgreSQLProcsessing
                         }
                     }
                 }
-                //intersections.Clear();
             }
             return innerJoinString;
 

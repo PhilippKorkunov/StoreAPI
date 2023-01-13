@@ -131,18 +131,24 @@ namespace StoreAPI.Controllers
 
                 dict.Remove("datetime");
                 dict.Remove("id_customer");
+                string c = "";
 
                 foreach (var product in productIdArray) 
                 {
                     dict["TableNames"] = "product_log";
                     dict["id_log"] = idLog;
                     dict["id_product"] = product[0].ToString();
-                    dict["id_order"] = product[1].ToString();
-
                     GetExecuteResult(method: "Insert2", dict: dict);
 
+                    Dictionary<string, string> deleteDict = new Dictionary<string, string>();
+                    deleteDict["TableNames"] = "store_order";
+                    deleteDict["Id"] = product[1].ToString();
+                   /* var d = new DeleteRequest(deleteDict);
+                    c = d.Command;*/
+                    GetExecuteResult(method: "Delete", dict: deleteDict);
+
                 }
-                return Ok(); 
+                return Ok(c); 
             }
 
             return BadRequest();
