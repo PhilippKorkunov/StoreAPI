@@ -147,40 +147,33 @@ namespace StoreAPI.PostgreSQLProcsessing
         {
             for (int i = 0; i < TableNames.Length - 1; i++)
             {
-                for (int j = 1; j < TableNames.Length; j++)
+                for (int j = i + 1; j < TableNames.Length; j++)
                 {
                     var intersection = Table.IntersectTables(Tables[TableNames[i]], Tables[TableNames[j]]);
                     if (intersection is not null)
                     {
                         CurrentTables[TableNames[i]].Intersections.Add($"{TableNames[j]}.{intersection}");
                         CurrentTables[TableNames[j]].Intersections.Add($"{TableNames[i]}.{intersection}");
+                        /*if (!CurrentTables[TableNames[i]].Intersections.Contains($"{TableNames[j]}.{intersection}"))
+                        {
+                            CurrentTables[TableNames[i]].Intersections.Add($"{TableNames[j]}.{intersection}");
+                        }
+                        if (!CurrentTables[TableNames[j]].Intersections.Contains($"{TableNames[i]}.{intersection}"))
+                        {
+                            CurrentTables[TableNames[j]].Intersections.Add($"{TableNames[i]}.{intersection}");
+                        }*/
                     }
                 }
             }
 
             var sotrtedCurrentTables = (from table in TableNames
-                                        orderby CurrentTables[table].Intersections.Count
+                                        orderby CurrentTables[table].Intersections.Count descending
                                         select table).ToArray();
 
             string innerJoinString = $"{sotrtedCurrentTables[0]}";
 
-            int t = 0;
-            for (int j = sotrtedCurrentTables.Length - 1; j >= 0; j--)
-            {
-                if (CurrentTables[sotrtedCurrentTables[j]].Intersections.Count > 0)
-                {
-                    t = j;
-                    break;
-                }
-                else
-                {
-                    innerJoinString += $", {sotrtedCurrentTables[j]}";
-                }
-            }
-
             innerJoinString += " ";
-
-            for (int i = 0; i < t; i++)
+            for (int i = 0; i < sotrtedCurrentTables.Length - 1; i++)
             {
                 var intersections = new List<string>() { };
                 intersections.AddRange(CurrentTables[sotrtedCurrentTables[i]].Intersections);
@@ -188,14 +181,17 @@ namespace StoreAPI.PostgreSQLProcsessing
                 {
                     var secondTable = intersection.Split('.')[0];
                     var columnName = intersection.Split('.')[1];
-                    if (RequestColumns is null || RequestColumns.Contains(columnName))
+                    if ((RequestColumns is null || RequestColumns.Contains(columnName)))
                     {
-                        innerJoinString += $"join {secondTable} on {sotrtedCurrentTables[i]}.{columnName} = {intersection} ";
-                        CurrentTables[secondTable].Intersections.Remove($"{sotrtedCurrentTables[i]}.{columnName}");
+                        if (sotrtedCurrentTables[i] != secondTable)
+                        {
+                            innerJoinString += $"join {secondTable} on {sotrtedCurrentTables[i]}.{columnName} = {intersection} ";
+                            CurrentTables[secondTable].Intersections.Remove($"{sotrtedCurrentTables[i]}.{columnName}");
+                        }
                     }
                 }
+                //intersections.Clear();
             }
-
             return innerJoinString;
 
         }

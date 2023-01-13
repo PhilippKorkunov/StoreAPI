@@ -102,7 +102,7 @@ namespace StoreAPI.Controllers
         [HttpGet("SelectLog")]
         public IActionResult SelectLog()
         {
-            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: (SelectRequest)LogRequest.Clone());
+            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: LogRequest);
         }
     
 
@@ -115,13 +115,11 @@ namespace StoreAPI.Controllers
                 var productIdArray = (from DataRow row in OrderTable.Rows
                                      select new List<object>() { row["id_product"], row["id_order"] }).ToList();
 
-                //return Ok(productIdArray);
-
                 Dictionary<string, string> dict = new Dictionary<string, string>();
                 dict["TableNames"] = "main_log";
                 dict["datetime"] = DateTime.Now.ToString();
                 dict["id_customer"] = idCustomer;
-                new InsertRequest2(dict).Execute();
+                GetExecuteResult(method: "Insert2", dict: dict);
 
                 Dictionary<string, string> selectDict = new Dictionary<string, string>();
                 selectDict["TableNames"] = "main_log";
@@ -141,7 +139,7 @@ namespace StoreAPI.Controllers
                     dict["id_product"] = product[0].ToString();
                     dict["id_order"] = product[1].ToString();
 
-                    new InsertRequest2(dict).Execute();
+                    GetExecuteResult(method: "Insert2", dict: dict);
 
                 }
                 return Ok(); 
