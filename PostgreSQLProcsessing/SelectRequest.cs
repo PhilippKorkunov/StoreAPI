@@ -1,9 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.Extensions.Options;
-using System.Data;
-using System.Linq;
-using System.Runtime.InteropServices;
-using static Npgsql.Replication.PgOutput.Messages.RelationMessage;
+﻿using System.Data;
 
 namespace StoreAPI.PostgreSQLProcsessing
 {
@@ -16,48 +11,56 @@ namespace StoreAPI.PostgreSQLProcsessing
             get
             {
                 if (isCommand) return base.Command;
-                if (TableNames.Length == 1) { return $"select {String.Join(", ", RequestColumns)} from {TableNames[0]} {WhereCondition} {Limit}"; }
-                return  $"select {String.Join(", ", RequestColumns)} from {InnerJoinString} {WhereCondition} {Limit}";
+                if (TableNames is not null && RequestColumns is not null)
+                {
+                    if (TableNames.Length == 1) 
+                    { return $"select {String.Join(", ", RequestColumns)} from {TableNames[0]} {WhereCondition} {Limit}"; }
+                    
+                    return $"select {String.Join(", ", RequestColumns)} from {InnerJoinString} {WhereCondition} {Limit}";
+                }
+
+                return base.Command;
             }
             set => base.Command = value; 
         }
         public string WhereCondition { 
-            get => whereCondtion;
+            get => whereCondition;
             set 
             {
                 if (String.IsNullOrEmpty(value))
                 {
-                    whereCondtion = string.Empty;
+                    whereCondition = string.Empty;
                 }
-                else if (value.Substring(0, 5) == "where")
+                else if (value[0..5] == "where")
                 {
-                    whereCondtion = value;
+                    whereCondition = value;
                 }
                 else
                 {
-                    whereCondtion = $"where {value}";
+                    whereCondition = $"where {value}";
                 }
             } 
         }
-
-        private string whereCondtion;
+        private string whereCondition;
         public string InnerJoinString { get; set; }
         public string[]? RequestColumns { get; set; }
         public string Limit { get; set; }
-        private List<string> UniqueColumns { get; set; }
-        private Dictionary<string, Table> CurrentTables { get; set; }
+        private List<string>? UniqueColumns { get; set; }
+        private Dictionary<string, Table>? CurrentTables { get; set; }
         public static new List<string> RequiredKeys { get; set; } = new List<string>() { "ColumnNames" };
 
-        public SelectRequest(Dictionary<string, string> dict) : base(dict)
+        public SelectRequest(Dictionary<string, string> dict) : base(dict, true)
         {
+            if (TableNames is null) { throw new ArgumentNullException("TableNames must be non null", nameof(TableNames)); }
+
             CheckDictCorrection(dict, RequiredKeys);
 
             isCommand = false;
 
-            if (dict.Keys.Contains("isTable") && dict["isTable"] == "true")
+            if (dict.ContainsKey("isTable") && dict["isTable"] == "true")
             {
                 RequestColumns = String.IsNullOrWhiteSpace(dict["ColumnNames"]) ||
-               String.IsNullOrEmpty(dict["ColumnNames"]) ? null : dict["ColumnNames"].Replace(" ", "").Split(',');
+                String.IsNullOrEmpty(dict["ColumnNames"]) ? null : dict["ColumnNames"].Replace(" ", "").Split(',');
                 
             }
             else
@@ -70,42 +73,39 @@ namespace StoreAPI.PostgreSQLProcsessing
 
             FillCurrentTables(dict);
 
-            WhereCondition = dict.Keys.Contains("WhereCondition") ? $"where {dict["WhereCondition"]}" : String.Empty;
-            InnerJoinString = TableNames.Length == 1 ? "" : BuildJoinString();
-            Limit = dict.Keys.Contains("Limit") ? $"Limit {dict["Limit"]}" : String.Empty;
+            whereCondition = String.Empty;
+            WhereCondition = dict.ContainsKey("WhereCondition") ? $"where {dict["WhereCondition"]}" : String.Empty;
+            InnerJoinString = TableNames.Length == 1 ? String.Empty : BuildJoinString();
+            Limit = dict.ContainsKey("Limit") ? $"Limit {dict["Limit"]}" : String.Empty;
 
-            BuildSelectString(dict);
+            BuildSelectString();
 
-            if (CurrentTables is not null)
-            {
-                CurrentTables.Clear();
-            }
-        }
-
-        public SelectRequest(string command) : base(command)
-        {
-            isCommand = true;
+            CurrentTables = null;
         }
 
         public SelectRequest(string[] tableNames, string[]? requestColumns, string innerJoinString, 
-            string whereCondition, string limit) : base(tableNames) 
+            string whereCondition, string limit) : base(true) 
         {
+            TableNames = tableNames;
             isCommand = false;
             RequestColumns = requestColumns;
+            this.whereCondition = String.Empty;
             WhereCondition = whereCondition;
             InnerJoinString = innerJoinString;
             Limit = limit;
-            //Command = request.Command;
         }
 
         public object Clone()
         {
+            if (TableNames is null) { throw new ArgumentNullException("TableNames must be non null", nameof(TableNames)); }
             return new SelectRequest(TableNames, RequestColumns, InnerJoinString, WhereCondition, Limit);
         }
 
         private void FillCurrentTables(Dictionary<string, string> dict)
         {
-            if (dict.Keys.Contains("isTable") && dict["isTable"] == "true")
+            if (TableNames is null) { throw new ArgumentNullException("TableNames must be non null", nameof(TableNames)); }
+
+            if (dict.ContainsKey("isTable") && dict["isTable"] == "true")
             {
                 return;
             }
@@ -122,10 +122,11 @@ namespace StoreAPI.PostgreSQLProcsessing
 
         private string FindTableOfColumn(string columnName)
         {
+            if (TableNames is null) { throw new ArgumentNullException("TableNames must be non null", nameof(TableNames)); }
 
             foreach (string tableName in TableNames)
             {
-                if (Tables[tableName].isColumnPKey(columnName))
+                if (Tables[tableName].IsColumnPKey(columnName))
                 {
                     return $"{tableName}.{columnName}";
                 }
@@ -133,7 +134,7 @@ namespace StoreAPI.PostgreSQLProcsessing
 
             foreach (string tableName in TableNames)
             {
-                if (Tables[tableName].isTableConatinsColumn(columnName))
+                if (Tables[tableName].IsTableConatinsColumn(columnName))
                 {
                     return $"{tableName}.{columnName}";
                 }
@@ -145,6 +146,9 @@ namespace StoreAPI.PostgreSQLProcsessing
 
         private string BuildJoinString()
         {
+            if (TableNames is null) { throw new ArgumentNullException("TableNames must be non null", nameof(TableNames)); }
+            if (CurrentTables is null) { throw new ArgumentNullException("CurrentTables must be non null", nameof(CurrentTables)); }
+
             for (int i = 0; i < TableNames.Length - 1; i++)
             {
                 for (int j = i + 1; j < TableNames.Length; j++)
@@ -189,6 +193,8 @@ namespace StoreAPI.PostgreSQLProcsessing
 
         private List<string> FindUniqueColumns()
         {
+            if (TableNames is null) { throw new ArgumentNullException("TableNames must be non null", nameof(TableNames)); }
+
             var uniqueColumns = new HashSet<string>();
 
             if (TableNames.Length > 1)
@@ -205,9 +211,9 @@ namespace StoreAPI.PostgreSQLProcsessing
 
 
 
-        private void BuildSelectString(Dictionary<string, string> dict)
+        private void BuildSelectString()
         {
-            if (TableNames.Length == 1)
+            if (TableNames is not null && TableNames.Length == 1)
             {
                 isCommand = true;
                 var columns = RequestColumns == null ? "*" : String.Join(", ", RequestColumns);
@@ -217,6 +223,7 @@ namespace StoreAPI.PostgreSQLProcsessing
             {
                 if (RequestColumns is null)
                 {
+                    if (UniqueColumns is null) { throw new ArgumentNullException("TableNames must be non null", nameof(UniqueColumns)); }
                     RequestColumns = UniqueColumns.ToArray();
                 }
 
@@ -224,14 +231,8 @@ namespace StoreAPI.PostgreSQLProcsessing
                 {
                     RequestColumns[i] = FindTableOfColumn(RequestColumns[i]);
                 }
-
-                //Command = $"select {String.Join(", ", RequestColumns)} from {InnerJoinString} {WhereCondition} {Limit}";
             }
-
         }
-
-
-        public DataTable? Execute() => Request.Execute(Command, isReader: true);
     }
 }
 

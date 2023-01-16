@@ -4,13 +4,16 @@ namespace StoreAPI.PostgreSQLProcsessing
 {
     public class InsertRequest : Request
     {
-        public string[] ColumnNames { get; set; }
-        public string[] Values { get; set; }
+        public string[]? ColumnNames{ get; set; }
+        public string[]? Values { get; set; }
 
         private protected static new List<string> RequiredKeys { get; set; } = new List<string>() { "ColumnNames", "Values" };
 
-        public InsertRequest(Dictionary<string, string> dict) : base(dict)
+        public InsertRequest(Dictionary<string, string>? dict) : base(dict, false)
         {
+            if (dict is null) { throw new ArgumentNullException(nameof(dict), "Dict must be non null"); }
+            if (TableNames is null) { throw new ArgumentNullException(nameof(TableNames), "TableNames must be non null"); }
+
             CheckDictCorrection(dict, RequiredKeys);
             CheckTableNamesLength(1);
 
@@ -23,6 +26,5 @@ namespace StoreAPI.PostgreSQLProcsessing
             Command = $"insert into {TableNames[0]} ({String.Join(", ", ColumnNames)} values {String.Join(", ", Values)})";
         }
 
-        public DataTable? Execute() => Request.Execute(Command, isReader: false);
     }
 }

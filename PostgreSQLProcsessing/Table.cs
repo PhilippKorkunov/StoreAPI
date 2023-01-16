@@ -9,7 +9,7 @@ namespace StoreAPI.PostgreSQLProcsessing
         public string[] ColumnNames { get; private set; }
         public List<string> Intersections { get; set; }
 
-        public Table(string tableName) 
+        public Table(string tableName)
         {
             TableName = tableName;
             ColumnNames = FindColumns();
@@ -17,7 +17,7 @@ namespace StoreAPI.PostgreSQLProcsessing
             Intersections = new List<string>();
         }
 
-        public Table(string tableName, string primaryKey, string[] columnNames) 
+        public Table(string tableName, string primaryKey, string[] columnNames)
         {
             TableName = tableName;
             PrimaryKey = primaryKey;
@@ -32,11 +32,11 @@ namespace StoreAPI.PostgreSQLProcsessing
 
         public static HashSet<string> FindAllTableNames()
         {
-            string findColumnsColumnCommand = "SELECT table_name FROM information_schema.tables\r\n" +
+            string findColumnsCommand = "SELECT table_name FROM information_schema.tables\r\n" +
              "WHERE table_schema NOT IN ('information_schema','pg_catalog')";
-            HashSet<string> tables = new HashSet<string>();
+            HashSet<string> tables = new ();
 
-            var keyTable = new SelectRequest(findColumnsColumnCommand).Execute();
+            var keyTable = new Request(findColumnsCommand, true).Execute();
             if (keyTable is not null)
             {
                 foreach (DataRow row in keyTable.Rows)
@@ -55,16 +55,15 @@ namespace StoreAPI.PostgreSQLProcsessing
             return tables;
         }
 
-        public bool isTableConatinsColumn(string columnName) => ColumnNames.Contains(columnName);
+        public bool IsTableConatinsColumn(string columnName) => ColumnNames.Contains(columnName);
 
-        public bool isColumnPKey(string columnName) => PrimaryKey == columnName;
+        public bool IsColumnPKey(string columnName) => PrimaryKey == columnName;
 
         public static string? IntersectTables(Table table1, Table table2)
         {
             var tableIntesection = (table1.ColumnNames.Intersect(table2.ColumnNames)).ToArray();
-            if (tableIntesection.Count() > 1)
+            if (tableIntesection.Length > 1)
             {
-                //throw new Exception("There are at least 2 intesrsctions");
                 foreach (var intersect in tableIntesection)
                 {
                     if (intersect == table1.PrimaryKey || intersect == table2.PrimaryKey)
@@ -74,29 +73,32 @@ namespace StoreAPI.PostgreSQLProcsessing
                     else { return tableIntesection[0]; }
                 }
             }
-            else if (tableIntesection.Count() == 1)
+            else if (tableIntesection.Length == 1)
             {
                 return tableIntesection[0];
             }
-            
+
 
             return null;
         }
-           
+
 
         private string[] FindColumns()
         {
-            Dictionary<string, string> dict = new Dictionary<string, string>();
-            dict["TableNames"] = TableName;
-            dict["Limit"] = "1";
-            dict["ColumnNames"] = " ";
-            dict["isTable"] = "true";
+            Dictionary<string, string> dict = new()
+            {
+
+                { "TableNames" , TableName},
+                { "Limit", "1" },
+                { "ColumnNames",  " " },
+                { "isTable" , "true" }
+            };
 
             var table = new SelectRequest(dict).Execute();
             if (table is not null)
             {
                 var columnNames = (from DataColumn column in table.Columns
-                               select column.ColumnName).ToArray();
+                                   select column.ColumnName).ToArray();
                 return columnNames;
             }
             else
@@ -110,7 +112,7 @@ namespace StoreAPI.PostgreSQLProcsessing
             string whereCondition = $"where TABLE_NAME = '{TableName}'";
             string pKeyCommand = $"SELECT TABLE_NAME, constraint_name\r\n|| '(' || string_agg(column_name, ',') || ')' as tableName\r\n" +
                 $"FROM information_schema.constraint_column_usage \r\n {whereCondition}\r\nGROUP BY TABLE_NAME, \r\nconstraint_name;";
-            var keyTable = new SelectRequest(pKeyCommand).Execute();
+            var keyTable = new Request(pKeyCommand, true).Execute();
             if (keyTable is not null)
             {
                 foreach (DataRow row in keyTable.Rows)

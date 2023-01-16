@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
-using System.Data;
+﻿using System.Data;
 
 namespace StoreAPI.PostgreSQLProcsessing
 {
@@ -13,8 +12,10 @@ namespace StoreAPI.PostgreSQLProcsessing
         private protected static new List<string> RequiredKeys { get; set; } = new List<string>() { "Id" };
 
 
-        public UpdateRequest2(Dictionary<string, string> dict) : base(dict)
+        public UpdateRequest2(Dictionary<string, string> dict) : base(dict, false)
         {
+            if (TableNames is null) { throw new ArgumentNullException(nameof(TableNames), "TableNames must be non null"); }
+
             CheckDictCorrection(dict, RequiredKeys);
             CheckTableNamesLength(1);
 
@@ -31,8 +32,5 @@ namespace StoreAPI.PostgreSQLProcsessing
                       select $"{key} = '{dict[key]}'").ToArray();
             Command = $"update {TableNames[0]} set {String.Join(",", setString)} {WhereCondition}";
         }
-
-        public DataTable? Execute() => Request.Execute(Command, isReader: false);
-
     }
 }

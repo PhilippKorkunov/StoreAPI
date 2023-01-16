@@ -10,8 +10,10 @@ namespace StoreAPI.PostgreSQLProcsessing
         public string[] Values { get; set; }
         private protected static new List<string> RequiredKeys { get; set; } = new List<string>() { "Id", "ColumnNames", "Values" };
 
-        public UpdateRequest(Dictionary<string, string> dict) : base(dict)
+        public UpdateRequest(Dictionary<string, string> dict) : base(dict, false)
         {
+            if (TableNames is null) { throw new ArgumentNullException(nameof(TableNames), "TableNames must be non null"); }
+
             CheckDictCorrection(dict, RequiredKeys);
             CheckTableNamesLength(1);
 
@@ -27,7 +29,5 @@ namespace StoreAPI.PostgreSQLProcsessing
             Command = $"update {TableNames[0]} set {String.Join(",", Values)} {WhereCondition}";
         }
 
-        public DataTable? Execute() => Request.Execute(Command, isReader: false);
-        
     }
 }

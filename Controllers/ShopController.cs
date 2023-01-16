@@ -2,19 +2,12 @@
 using StoreAPI.PostgreSQLProcsessing;
 using Newtonsoft.Json;
 using System.Text.Json;
-using Newtonsoft.Json.Linq;
 using System.Text;
-using System.Reflection;
-using System.Xml.Linq;
-using System.Diagnostics.Eventing.Reader;
-//using Microsoft.AspNetCore.Cors;
-using System.Web.Http.Cors;
 using System.Data;
-using System.Web.Http.Dispatcher;
+using System.Web.Http.Cors;
 
 namespace StoreAPI.Controllers
 {
-
     [EnableCors("*","*","*")]
     [ApiController]
     [Route("api/[controller]")]
@@ -23,7 +16,6 @@ namespace StoreAPI.Controllers
         private static SelectRequest AdminRequest { get; set; }
         private static SelectRequest CustomerRequest { get; set; }
         private static SelectRequest OrderRequest { get; set; }
-        private DataTable? OrderTable { get; set; }
         private static SelectRequest ProductRequest { get; set; }
         private static SelectRequest LogRequest { get; set; }
 
@@ -39,7 +31,7 @@ namespace StoreAPI.Controllers
 
         private static Dictionary<string, string> CreateDict(string key)
         {
-            Dictionary<string, string> dict = new Dictionary<string, string>();
+            Dictionary<string, string> dict = new();
             switch (key)
             {
                 case "SelectCustomer":
@@ -71,169 +63,125 @@ namespace StoreAPI.Controllers
 
 
         [HttpGet("Select")]
-        public IActionResult Select()
+        public async Task<IActionResult> Select()
         {
-            Dictionary<string, string> dict = new Dictionary<string, string>();
-            /* dict["TableNames"] = "product, category, store_order";
-             dict["columnNames"] = " ";*/
-            return GetExecuteResult(method: "SelectDict", dict: dict);
+            Dictionary<string, string> dict = new();
+            return await GetExecuteResult(request : new SelectRequest(dict));
         }
 
         [HttpGet("SelectUser")]
-        public IActionResult SelectUser(string login, string password, bool isAdmin)
+        public async Task<IActionResult> SelectUser(string login, string password, bool isAdmin)
         {
-            var requst = isAdmin? (SelectRequest)AdminRequest.Clone() : (SelectRequest)CustomerRequest.Clone();
-            requst.WhereCondition = $"email = '{login}' and password = '{password}'";
-            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: requst);
+            var userRequest = isAdmin? (SelectRequest)AdminRequest.Clone() : (SelectRequest)CustomerRequest.Clone();
+            userRequest.WhereCondition = $"email = '{login}' and password = '{password}'";
+            return await GetExecuteResult(request: userRequest);
         }
 
         [HttpGet("SelectProductList")]
-        public IActionResult SelectProductList() => GetExecuteResult(method: "SelectStaticCommand", selectRequest: (SelectRequest)ProductRequest.Clone());
+        public async Task<IActionResult> SelectProductList() => await GetExecuteResult(request: (SelectRequest)ProductRequest.Clone());
 
 
         [HttpGet("SelectOrder")]
-        public IActionResult SelectOrder(string idCustomer)
+        public async Task<IActionResult> SelectOrder(string idCustomer, bool isJson = true)
         {
-            var requst = (SelectRequest)OrderRequest.Clone();
-            requst.WhereCondition = $"id_customer = '{idCustomer}'";
-            return GetExecuteResult(method: "SelectStaticOrderCommand", selectRequest: requst);
+            var orderRequest = (SelectRequest)OrderRequest.Clone();
+            orderRequest.WhereCondition = $"id_customer = '{idCustomer}'";
+            return await GetExecuteResult(request: orderRequest, isJson: isJson);
         }
 
         [HttpGet("SelectLog")]
-        public IActionResult SelectLog()
-        {
-            return GetExecuteResult(method: "SelectStaticCommand", selectRequest: LogRequest);
-        }
+        public async Task<IActionResult> SelectLog() => await GetExecuteResult(request: LogRequest);
     
 
-        [HttpPost("PushOrder")]
-        public IActionResult PushOrder(string idCustomer)
+        [HttpGet("PushOrder")]
+        public async Task<IActionResult> PushOrderAsync(string idCustomer)
         {
-            SelectOrder(idCustomer);
-            if (OrderTable is not null) 
-            {
-                var productIdArray = (from DataRow row in OrderTable.Rows
-                                     select new List<object>() { row["id_product"], row["id_order"] }).ToList();
+            var selectResult = (OkObjectResult) await SelectOrder(idCustomer, false);
+            if (selectResult.Value is null) { throw new ArgumentNullException(nameof(selectResult.Value), "Data Table must be non null"); }
+            DataTable orderTable = (DataTable)selectResult.Value;
 
-                Dictionary<string, string> dict = new Dictionary<string, string>();
-                dict["TableNames"] = "main_log";
-                dict["datetime"] = DateTime.Now.ToString();
-                dict["id_customer"] = idCustomer;
-                GetExecuteResult(method: "Insert2", dict: dict);
+            var productIdArray = (from DataRow row in orderTable.Rows
+                                  select new List<object>() { row["id_product"], row["id_order"] }).ToList();
 
-                Dictionary<string, string> selectDict = new Dictionary<string, string>();
-                selectDict["TableNames"] = "main_log";
-                selectDict["ColumnNames"] = "";
-                selectDict["WhereCondition"] = $"datetime = '{dict["datetime"]}'";
-
-                DataRow tableRow = new SelectRequest(selectDict).Execute().Rows[0];
-                string idLog = tableRow["id_log"].ToString();
-
-                dict.Remove("datetime");
-                dict.Remove("id_customer");
-                string c = "";
-
-                foreach (var product in productIdArray) 
+            Dictionary<string, string> dict = new()
                 {
-                    dict["TableNames"] = "product_log";
-                    dict["id_log"] = idLog;
-                    dict["id_product"] = product[0].ToString();
-                    GetExecuteResult(method: "Insert2", dict: dict);
+                    { "TableNames", "main_log" },
+                    { "datetime", DateTime.Now.ToString()},
+                    { "id_customer", idCustomer}
+                };
+            await GetExecuteResult(request: new InsertRequest2(dict));
 
-                    Dictionary<string, string> deleteDict = new Dictionary<string, string>();
-                    deleteDict["TableNames"] = "store_order";
-                    deleteDict["Id"] = product[1].ToString();
-                   /* var d = new DeleteRequest(deleteDict);
-                    c = d.Command;*/
-                    GetExecuteResult(method: "Delete", dict: deleteDict);
+            Dictionary<string, string> selectDict = new()
+                {
+                    { "TableNames", "main_log" },
+                    { "ColumnNames", "" },
+                    { "WhereCondition", $"datetime = '{dict["datetime"]}'" }
+                };
 
-                }
-                return Ok(c); 
+            var result = (OkObjectResult)(await GetExecuteResult(new SelectRequest(selectDict), true));
+            if (result.Value is null) { throw new ArgumentNullException(nameof(result.Value), "Data Table must be non null"); }
+
+            DataTable table = (DataTable)result.Value;
+            DataRow tableRow = table.Rows[0];
+            string? idLog = tableRow["id_log"].ToString();
+            if (idLog is null) { throw new ArgumentNullException(nameof(idLog), "id_log must be non null"); }
+
+            dict.Remove("datetime");
+            dict.Remove("id_customer");
+
+            foreach (var product in productIdArray)
+            {
+                dict["TableNames"] = "product_log";
+                dict["id_log"] = idLog;
+                var idProduct = product[index: 0].ToString();
+                if (idProduct is null) { throw new ArgumentNullException(nameof(idProduct), "id_product must be non null"); }
+                dict["id_product"] = idProduct;
+                await GetExecuteResult(new InsertRequest2(dict));
+
+                var id = product[index: 1].ToString();
+                if (id is null) { throw new ArgumentNullException(nameof(id), "id_product must be non null"); }
+                Dictionary<string, string> deleteDict = new()
+                    {
+                        { "TableNames",  "store_order"},
+                        { "Id", id }
+                    };
+                await GetExecuteResult(new DeleteRequest(dict));
             }
-
-            return BadRequest();
+            return Ok();
         }
 
 
 
         [HttpPost("Insert")]
-        public IActionResult Insert(JsonDocument jsonDocument) => GetExecuteResult(jsonDocument: jsonDocument, method: "Insert");
+        public async Task<IActionResult> Insert(JsonDocument jsonDocument) => await GetExecuteResult(request: new InsertRequest(ToJsonDict(jsonDocument)));
 
         [HttpPost("Insert2")]
-        public IActionResult Insert2(JsonDocument jsonDocument) => GetExecuteResult(jsonDocument: jsonDocument, method: "Insert2");
+        public async Task<IActionResult> Insert2(JsonDocument jsonDocument) => await GetExecuteResult(request: new InsertRequest2(ToJsonDict(jsonDocument)));
 
         [HttpPut("Update")]
-        public IActionResult Update(JsonDocument jsonDocument) => GetExecuteResult(jsonDocument: jsonDocument, method: "Update");
+        public async Task<IActionResult> Update(JsonDocument jsonDocument) => await GetExecuteResult(request: new UpdateRequest(ToJsonDict(jsonDocument)));
 
         [HttpPut("Update2")]
-        public IActionResult Update2(JsonDocument jsonDocument) => GetExecuteResult(jsonDocument: jsonDocument, method: "Update2");
+        public async Task<IActionResult> Update2(JsonDocument jsonDocument) => await GetExecuteResult(request: new UpdateRequest2(ToJsonDict(jsonDocument)));
 
         [HttpDelete("Delete")]
-        public IActionResult Delete(JsonDocument jsonDocument) => GetExecuteResult(jsonDocument: jsonDocument, method: "Delete");
+        public async Task<IActionResult> Delete(JsonDocument jsonDocument) => await GetExecuteResult(request: new DeleteRequest(ToJsonDict(jsonDocument)));
 
 
-        private IActionResult GetExecuteResult(JsonDocument? jsonDocument = null, Dictionary<string, string>? dict = null, 
-            string? method = null, string? command = null, SelectRequest? selectRequest = null)
+
+
+        private async Task<IActionResult> GetExecuteResult(Request request, bool isJson = true)
         {
-            if (method is null) { return BadRequest("Method is null"); }
-
             try
             {
-                if (jsonDocument is not null || dict is not null || command is not null || selectRequest is not null)
+                if (isJson)
                 {
-                    string json = ToJsonString(jsonDocument);
-                    dict = dict is null ? JsonConvert.DeserializeObject<Dictionary<string, string>>(json) : dict;
-                    if (dict is not null || command is not null || selectRequest is not null)
-                    {
-                        switch (method)
-                        {
-                            case "SelectDict":
-                                SelectRequest selectDictRequest = new SelectRequest(dict);
-                                return Ok(JsonConvert.SerializeObject(selectDictRequest.Execute()));
-                            case "SelectCommand":
-                                if (command is not null)
-                                {
-                                    SelectRequest selectCommandRequest = new SelectRequest(command);
-                                    return Ok(JsonConvert.SerializeObject(selectCommandRequest.Execute()));
-                                }
-                                return BadRequest($"Command is null");
-                            case "SelectStaticCommand":
-                                if (selectRequest is not null)
-                                {
-                                    return Ok(JsonConvert.SerializeObject(selectRequest.Execute()));
-                                }
-                                return BadRequest("Select Request is null");
-                            case "SelectStaticOrderCommand":
-                                if (selectRequest is not null)
-                                {
-                                    OrderTable = selectRequest.Execute();
-                                    return Ok(JsonConvert.SerializeObject(OrderTable));
-                                }
-                                return BadRequest("Select Request is null");
-                            case "Delete":
-                                DeleteRequest deleteRequest = new DeleteRequest(dict);
-                                return Ok(deleteRequest.Execute());
-                            case "Insert":
-                                InsertRequest insertRequest = new InsertRequest(dict);
-                                insertRequest.Execute();
-                                return Ok(insertRequest.Execute());
-                            case "Insert2":
-                                InsertRequest2 insertRequest2 = new InsertRequest2(dict);
-                                return Ok(insertRequest2.Execute());
-                            case "Update":
-                                UpdateRequest updateRequest = new UpdateRequest(dict);
-                                return Ok(updateRequest.Execute());
-                            case "Update2":
-                                UpdateRequest2 updateRequest2 = new UpdateRequest2(dict);
-                                return Ok(updateRequest2.Execute());
-                            default:
-                                return BadRequest();
-                        }
-
-                    }
-                    return BadRequest("Dictionary of inputed json is null");
+                    return Ok(JsonConvert.SerializeObject(await request.ExecuteAsync()));
                 }
-                return BadRequest("Json is null");
+                else 
+                {
+                    return Ok(await request.ExecuteAsync());
+                }
             }
             catch (Exception ex)
             {
@@ -241,19 +189,22 @@ namespace StoreAPI.Controllers
             }
         }
 
-        private static string ToJsonString(JsonDocument? jdoc)
+
+        private protected static string ToJsonString(JsonDocument? json)
         {
-            using (var stream = new MemoryStream())
-            {
-                if (jdoc is not null)
-                {
-                    Utf8JsonWriter writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
-                    jdoc.WriteTo(writer);
-                    writer.Flush();
-                    return Encoding.UTF8.GetString(stream.ToArray());
-                }
-            }
-            return string.Empty;
+            if (json is null) { throw new ArgumentNullException(nameof(json), "Json must be non null"); }
+            using var stream = new MemoryStream();
+            Utf8JsonWriter writer = new(stream, new JsonWriterOptions { Indented = true });
+            json.WriteTo(writer);
+            writer.Flush();
+            return Encoding.UTF8.GetString(stream.ToArray());
+        }
+
+        private protected static Dictionary<string, string> ToJsonDict(JsonDocument? json)
+        {
+            var jsonDict = JsonConvert.DeserializeObject<Dictionary<string, string>>(ToJsonString(json));
+            if (jsonDict is null) { throw new ArgumentNullException(nameof(jsonDict), "Json Dict must be non null"); }
+            return jsonDict;
         }
     }
 

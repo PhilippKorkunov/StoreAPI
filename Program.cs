@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Builder;
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 
